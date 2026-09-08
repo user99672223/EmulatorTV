@@ -4,6 +4,7 @@ struct ContentView: View {
     @StateObject private var library = GameLibrary()
     @ObservedObject private var runner = EmulatorRunner.shared
     @ObservedObject private var controllers = ControllerManager.shared
+    @ObservedObject private var uploads = UploadServer.shared
 
     @State private var selected: StoredFile?
     @State private var poolMiB: Int = 0     // 0 == leave the core's default alone
@@ -96,6 +97,27 @@ struct ContentView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Upload").font(.headline)
+                    if let address = uploads.address {
+                        Text(address).font(.title3.monospaced())
+                        Text("Open that in a browser on your PC")
+                            .font(.footnote).foregroundStyle(.secondary)
+                        Text("curl -T rl.nsp " + address + "/rl.nsp")
+                            .font(.footnote.monospaced()).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(uploads.isRunning ? "starting..." : "server not running")
+                            .foregroundStyle(.secondary)
+                    }
+                    if let event = uploads.lastEvent {
+                        Text(event).font(.footnote).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 if let msg = runner.lastMessage {
                     Text(msg).foregroundStyle(.secondary).font(.footnote)
                 }
@@ -103,7 +125,10 @@ struct ContentView: View {
             .frame(maxWidth: 620, alignment: .leading)
         }
         .padding(60)
-        .onAppear { library.refresh() }
+        .onAppear {
+            library.refresh()
+            uploads.start()
+        }
     }
 
     private var startTitle: String {

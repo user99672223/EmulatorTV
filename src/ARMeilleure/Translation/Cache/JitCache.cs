@@ -1,4 +1,5 @@
-﻿using ARMeilleure.CodeGen;
+﻿using Ryujinx.Common.Logging;
+using ARMeilleure.CodeGen;
 using ARMeilleure.CodeGen.Unwinding;
 using ARMeilleure.Memory;
 using ARMeilleure.Native;
@@ -209,7 +210,7 @@ namespace ARMeilleure.Translation.Cache
 
             int allocOffset = _cacheAllocator.Allocate(ref codeSize, alignment);
 
-            Console.WriteLine($"{allocOffset:x8}: {codeSize:x8} {alignment:x8}");
+            Logger.Debug?.Print(LogClass.Cpu, $"{allocOffset:x8}: {codeSize:x8} {alignment:x8}");
 
             if (allocOffset < 0)
             {

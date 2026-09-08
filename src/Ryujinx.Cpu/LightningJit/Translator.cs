@@ -70,7 +70,7 @@ namespace Ryujinx.Cpu.LightningJit
                 string dualMapped = Environment.GetEnvironmentVariable("DUAL_MAPPED_JIT");
                 if (dualMapped == "1") //(OperatingSystem.IsIOSVersionAtLeast(19) || OperatingSystem.IsIOSVersionAtLeast(26))
                 {
-                    Console.WriteLine($"Dual Mapped JIT enabled.");
+                    Logger.Info?.Print(LogClass.Cpu, "Dual Mapped JIT enabled.");
                     if (DualMappedJitAllocator.hasTXM)
                     {
                         if (originalDualMappedCache == null) {
@@ -132,7 +132,7 @@ namespace Ryujinx.Cpu.LightningJit
                 string dualMapped = Environment.GetEnvironmentVariable("DUAL_MAPPED_JIT");
                 if (dualMapped == "1") //(OperatingSystem.IsIOSVersionAtLeast(19) || OperatingSystem.IsIOSVersionAtLeast(26))
                 {
-                    Console.WriteLine($"Dual Mapped JIT enabled.");
+                    Logger.Info?.Print(LogClass.Cpu, "Dual Mapped JIT enabled.");
                     try {
                         if (originalDualMappedCache == null) {
                             originalDualMappedCache = new(new JitMemoryAllocator(), CreateStackWalker());

@@ -54,6 +54,10 @@ targets:
         # Lets a paired DualSense drive the interface, not just gameplay.
         GCSupportsControllerUserInteraction: true
         GCSupportsMultipleMicroGamepads: true
+        # SDL asks for this at startup; without it UIKit withholds indirect
+        # (pointer/trackpad-style) input events, which is how the Siri Remote's
+        # touch surface is delivered.
+        UIApplicationSupportsIndirectInputEvents: true
     # No entitlements are requested. extended-virtual-addressing needs a paid
     # account, and requesting an entitlement the provisioning profile cannot
     # grant makes the install itself fail. It is also not needed here: Apple
