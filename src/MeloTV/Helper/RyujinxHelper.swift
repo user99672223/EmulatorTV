@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import os
 
 // A source replacement for the prebuilt RyujinxHelper.framework, which only
 // exists as an iOS-platform binary with no source anywhere in the tree.
@@ -173,4 +174,19 @@ public func getKeyboardInput() -> UnsafeMutablePointer<CChar>? {
 @_cdecl("clearKeyboardInput")
 public func clearKeyboardInput() {
     keyboardLock.lock(); keyboardText = nil; keyboardLock.unlock()
+}
+
+// MARK: - Logging
+
+// The core's log lines reach the unified log through stdout, where os_log treats
+// dynamic strings as private and prints <private> instead of the message. That
+// makes a managed exception undiagnosable without symbolication. Re-emitting the
+// text with an explicit {public} specifier keeps it readable in Console.app and
+// in a device sysdiagnose.
+private let meloLog = OSLog(subsystem: "com.melotv.app", category: "emulator")
+
+@_cdecl("MeloLogPublic")
+public func MeloLogPublic(_ message: UnsafePointer<CChar>?) {
+    guard let message else { return }
+    os_log("%{public}s", log: meloLog, type: .default, String(cString: message))
 }

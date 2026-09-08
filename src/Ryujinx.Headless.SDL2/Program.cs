@@ -480,7 +480,34 @@ namespace Ryujinx.Headless.SDL2
         [UnmanagedCallersOnly(EntryPoint = "initialize")]
         public static unsafe void Initialize()
         {
-            AppDataManager.Initialize(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            try
+            {
+                InitializeCore();
+            }
+            catch (Exception ex)
+            {
+                // An exception crossing an UnmanagedCallersOnly boundary aborts the
+                // process with no message at all, which is how the first tvOS launch
+                // failure presented: SIGABRT and an unsymbolicated backtrace. Log it
+                // first so the reason survives.
+                Logger.Error?.Print(LogClass.Application, $"initialize failed: {ex}");
+                throw;
+            }
+        }
+
+        private static unsafe void InitializeCore()
+        {
+            // On tvOS, Documents is sandbox-denied, but the container root it
+            // resolves to still passes Directory.Exists -- so passing it here makes
+            // AppDataManager adopt it as a "custom" data directory and then throw
+            // from SetupBasePaths' first CreateDirectory. Passing null lets
+            // AppDataManager use the location it computes for itself, which is
+            // Library/Caches, the only place tvOS actually lets an app write.
+            string customDataDir = OperatingSystem.IsTvOS()
+                ? null
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+            AppDataManager.Initialize(customDataDir);
 
             if (_virtualFileSystem == null)
             {

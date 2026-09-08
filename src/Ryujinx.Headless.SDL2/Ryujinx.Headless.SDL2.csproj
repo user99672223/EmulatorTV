@@ -18,7 +18,11 @@
   </PropertyGroup>
 
 <PropertyGroup>
-  <!-- <StripSymbols>false</StripSymbols>  -->
+  <!-- Keep the symbol table. Stripped, the whole 35 MB binary exposes only 35
+       exported symbols, so every crash frame resolves to "last export + 0x2xxxxx"
+       and a backtrace says nothing. Full debug info stays off: it is far larger
+       and the public log lines carry the exception text anyway. -->
+  <StripSymbols>false</StripSymbols>
   <!-- <IlcGenerateDebugInfo>true</IlcGenerateDebugInfo> -->
 </PropertyGroup>
   <!-- iOS linking stuff from godot -->
