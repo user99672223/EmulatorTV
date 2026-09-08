@@ -1,4 +1,4 @@
-using Ryujinx.Common;
+﻿using Ryujinx.Common;
 using Ryujinx.Common.Collections;
 using Ryujinx.Memory;
 using Ryujinx.Memory.Tracking;
@@ -57,7 +57,27 @@ namespace Ryujinx.Cpu.Jit.HostTracked
 
     class AddressSpacePartitionAllocator : PrivateMemoryAllocatorImpl<AddressSpacePartitionAllocator.Block>
     {
-        private const ulong DefaultBlockAlignment = 1UL << 32; // 4GB
+        // Backing blocks are reserved in multiples of this, so the first guest page
+        // mapped costs a whole block of address space. 4 GB is fine on a desktop and
+        // fatal on a host without extended-virtual-addressing: with the JIT caches,
+        // guest DRAM and the page table already reserved, a 4 GB block put the total
+        // past the limit and mmap returned ENOMEM. Partitions are 32 MB, so a 256 MB
+        // block still batches eight of them per reservation.
+        private static readonly ulong DefaultBlockAlignment = BlockAlignmentFromEnv();
+
+        private static ulong BlockAlignmentFromEnv()
+        {
+            string value = Environment.GetEnvironmentVariable("AS_BLOCK_ALIGN_MIB");
+
+            if (ulong.TryParse(value, out ulong mib) && mib > 0)
+            {
+                return mib * 1024 * 1024;
+            }
+
+            return (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+                ? 256UL * 1024 * 1024
+                : 1UL << 32;
+        }
 
         public class Block : PrivateMemoryAllocator.Block
         {
