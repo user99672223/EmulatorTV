@@ -25,6 +25,19 @@ final class EmulatorRunner: ObservableObject {
         guard !isRunning, !isPreparing else { return }
         lastMessage = nil
 
+        // A debugger may have attached since launch, so this is re-read rather than
+        // cached. Starting without it is a guaranteed kill at the first guest
+        // instruction, and the kill is silent -- better to say so than to crash.
+        JitStatus.report("at game start")
+
+        guard JitStatus.isDebugged else {
+            lastMessage = """
+                JIT is not enabled for this launch (CS_DEBUGGED is not set).
+                The emulator would be killed by the kernel at the first guest                 instruction. Attach the debugger, then press Start again.
+                """
+            return
+        }
+
         var args: [String] = [game.path]
 
         args += ["--graphics-backend", "Vulkan"]

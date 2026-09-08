@@ -8,6 +8,12 @@ struct MeloTVApp: App {
         // replacing it. A native fault currently leaves nothing in the log at all.
         CrashReporter.install()
 
+        // Says immediately whether JIT execution is legal on this launch. Without
+        // CS_DEBUGGED the emulator dies at the first guest instruction with no signal
+        // and no log line, so this is the difference between a diagnosable run and a
+        // silent return to the home screen.
+        JitStatus.report("at launch")
+
         Paths.ensureDirectories()
 
         // Every one of these has to be set before initialize(), because the core
