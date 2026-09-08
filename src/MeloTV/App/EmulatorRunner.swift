@@ -1,6 +1,5 @@
 import Foundation
 
-@MainActor
 final class EmulatorRunner: ObservableObject {
     static let shared = EmulatorRunner()
 
@@ -45,7 +44,7 @@ final class EmulatorRunner: ObservableObject {
 
         let thread = Thread {
             let result = RyujinxBridge.mainRyu(argv: args)
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 EmulatorRunner.shared.isRunning = false
                 EmulatorRunner.shared.lastMessage = "Emulator exited with code \(result)."
             }

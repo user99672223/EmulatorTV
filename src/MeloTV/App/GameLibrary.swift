@@ -6,7 +6,8 @@ struct StoredFile: Identifiable, Hashable {
     var name: String { url.lastPathComponent }
     var isGame: Bool { ["nsp", "xci", "nca", "nro"].contains(url.pathExtension.lowercased()) }
     var sizeBytes: Int64 {
-        (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attrs?[.size] as? Int64) ?? 0
     }
     var sizeText: String {
         ByteCountFormatter.string(fromByteCount: sizeBytes, countStyle: .file)
@@ -15,7 +16,6 @@ struct StoredFile: Identifiable, Hashable {
 
 /// Lists whatever the app actually has on disk and reports what is missing,
 /// rather than letting the emulator fail somewhere deeper with a worse message.
-@MainActor
 final class GameLibrary: ObservableObject {
     @Published private(set) var files: [StoredFile] = []
     @Published private(set) var firmwareVersion: String?

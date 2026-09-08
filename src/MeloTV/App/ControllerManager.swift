@@ -4,12 +4,12 @@ import GameController
 /// Feeds a physical controller straight into the core through its native gamepad
 /// API. There is no touch input on tvOS and no on-screen pad, so this is the only
 /// way anything reaches the guest.
-@MainActor
 final class ControllerManager: ObservableObject {
     static let shared = ControllerManager()
 
     @Published private(set) var connectedName: String?
 
+    private let lock = NSLock()
     private var token: UnsafeMutableRawPointer?
     private var current: GCController?
 
@@ -18,11 +18,11 @@ final class ControllerManager: ObservableObject {
     func begin() {
         NotificationCenter.default.addObserver(
             forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] note in
-                Task { @MainActor in self?.attach(note.object as? GCController) }
+                self?.attach(note.object as? GCController)
             }
         NotificationCenter.default.addObserver(
             forName: .GCControllerDidDisconnect, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.detach() }
+                self?.detach()
             }
         attach(GCController.controllers().first)
     }
@@ -35,7 +35,7 @@ final class ControllerManager: ObservableObject {
         let id = UnsafeMutableRawPointer(bitPattern: UInt(1))
         RyujinxBridge.attachGamepad(id, controller.vendorName ?? "Controller")
 
-        token = id
+        lock.lock(); token = id; lock.unlock()
         current = controller
         connectedName = controller.vendorName
 
@@ -45,8 +45,10 @@ final class ControllerManager: ObservableObject {
     }
 
     private func detach() {
+        lock.lock()
         if let token { RyujinxBridge.detachGamepad(token) }
         token = nil
+        lock.unlock()
         current = nil
         connectedName = nil
     }
@@ -59,36 +61,37 @@ final class ControllerManager: ObservableObject {
         case leftTrigger = 15, rightTrigger = 16
     }
 
-    private func set(_ button: B, _ pressed: Bool) {
-        RyujinxBridge.setGamepadButtonState(token, buttonId: button.rawValue, pressed: pressed)
+    private func set(_ id: UnsafeMutableRawPointer, _ button: B, _ pressed: Bool) {
+        RyujinxBridge.setGamepadButtonState(id, buttonId: button.rawValue, pressed: pressed)
     }
 
     private func push(_ pad: GCExtendedGamepad) {
-        guard token != nil else { return }
+        lock.lock(); let id = token; lock.unlock()
+        guard let token = id else { return }
 
         // GameController names buttons by position: buttonA is the bottom face
         // button. On a Switch pad the bottom button is B and the right one is A,
         // so the two pairs are swapped here rather than in the guest.
-        set(.b, pad.buttonA.isPressed)
-        set(.a, pad.buttonB.isPressed)
-        set(.y, pad.buttonX.isPressed)
-        set(.x, pad.buttonY.isPressed)
+        set(token, .b, pad.buttonA.isPressed)
+        set(token, .a, pad.buttonB.isPressed)
+        set(token, .y, pad.buttonX.isPressed)
+        set(token, .x, pad.buttonY.isPressed)
 
-        set(.leftShoulder, pad.leftShoulder.isPressed)
-        set(.rightShoulder, pad.rightShoulder.isPressed)
-        set(.leftTrigger, pad.leftTrigger.isPressed)
-        set(.rightTrigger, pad.rightTrigger.isPressed)
+        set(token, .leftShoulder, pad.leftShoulder.isPressed)
+        set(token, .rightShoulder, pad.rightShoulder.isPressed)
+        set(token, .leftTrigger, pad.leftTrigger.isPressed)
+        set(token, .rightTrigger, pad.rightTrigger.isPressed)
 
-        set(.dPadUp, pad.dpad.up.isPressed)
-        set(.dPadDown, pad.dpad.down.isPressed)
-        set(.dPadLeft, pad.dpad.left.isPressed)
-        set(.dPadRight, pad.dpad.right.isPressed)
+        set(token, .dPadUp, pad.dpad.up.isPressed)
+        set(token, .dPadDown, pad.dpad.down.isPressed)
+        set(token, .dPadLeft, pad.dpad.left.isPressed)
+        set(token, .dPadRight, pad.dpad.right.isPressed)
 
-        set(.start, pad.buttonMenu.isPressed)
-        if let options = pad.buttonOptions { set(.back, options.isPressed) }
-        if let home = pad.buttonHome { set(.guide, home.isPressed) }
-        if let l3 = pad.leftThumbstickButton { set(.leftStick, l3.isPressed) }
-        if let r3 = pad.rightThumbstickButton { set(.rightStick, r3.isPressed) }
+        set(token, .start, pad.buttonMenu.isPressed)
+        if let options = pad.buttonOptions { set(token, .back, options.isPressed) }
+        if let home = pad.buttonHome { set(token, .guide, home.isPressed) }
+        if let l3 = pad.leftThumbstickButton { set(token, .leftStick, l3.isPressed) }
+        if let r3 = pad.rightThumbstickButton { set(token, .rightStick, r3.isPressed) }
 
         // 1 == left stick, 2 == right stick.
         RyujinxBridge.setGamepadStickAxis(token, stickId: 1,

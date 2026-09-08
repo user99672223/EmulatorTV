@@ -2,8 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var library = GameLibrary()
-    @StateObject private var runner = EmulatorRunner.shared
-    @StateObject private var controllers = ControllerManager.shared
+    @ObservedObject private var runner = EmulatorRunner.shared
+    @ObservedObject private var controllers = ControllerManager.shared
 
     @State private var selected: StoredFile?
     @State private var poolMiB: Int = 0     // 0 == leave the core's default alone
@@ -32,15 +32,17 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: 700, alignment: .leading)
                 } else {
-                    List(library.files, selection: $selected) { file in
+                    List(library.files) { file in
                         Button {
                             if file.isGame { selected = file }
                         } label: {
                             HStack {
+                                Image(systemName: selected?.id == file.id
+                                      ? "largecircle.fill.circle" : "circle")
+                                    .opacity(file.isGame ? 1 : 0)
                                 Text(file.name).lineLimit(1)
                                 Spacer()
                                 Text(file.sizeText).foregroundStyle(.secondary)
-                                if file.isGame { Image(systemName: "gamecontroller") }
                             }
                         }
                     }
