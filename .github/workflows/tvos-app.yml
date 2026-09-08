@@ -45,14 +45,20 @@ jobs:
           mkdir -p "$DEST"
 
           DYLIB=$(find incoming -name "Ryujinx.Headless.SDL2.dylib" | head -1)
-          SDL=$(find incoming -name "SDL2.framework" -type d | head -1)
           MVK=$(find incoming -name "libMoltenVK.dylib" | head -1)
-          echo "core : $DYLIB"; echo "sdl2 : $SDL"; echo "mvk  : $MVK"
-          [ -n "$DYLIB" ] && [ -n "$SDL" ] && [ -n "$MVK" ] || { echo "a dependency is missing"; exit 1; }
+          # upload-artifact stores a directory's CONTENTS, so SDL2.framework
+          # arrives as loose files (SDL2, Headers/, CMake/, ...) with no wrapper
+          # directory. The bundle is reassembled around them here.
+          SDLBIN=$(find incoming/SDL2-tvos-arm64 -maxdepth 1 -name SDL2 -type f | head -1)
+          echo "core : $DYLIB"; echo "sdl2 : $SDLBIN"; echo "mvk  : $MVK"
+          [ -n "$DYLIB" ] && [ -n "$SDLBIN" ] && [ -n "$MVK" ] || { echo "a dependency is missing"; exit 1; }
 
           cp "$DYLIB" "$DEST/"
           cp "$MVK"   "$DEST/"
-          rm -rf "$DEST/SDL2.framework"; cp -R "$SDL" "$DEST/"
+          rm -rf "$DEST/SDL2.framework"
+          mkdir -p "$DEST/SDL2.framework"
+          cp -R incoming/SDL2-tvos-arm64/. "$DEST/SDL2.framework/"
+          [ -f "$DEST/SDL2.framework/SDL2" ] || { echo "SDL2.framework did not reassemble"; exit 1; }
 
           # dlopen has to find these by @rpath from inside the bundle.
           install_name_tool -id @rpath/Ryujinx.Headless.SDL2.dylib "$DEST/Ryujinx.Headless.SDL2.dylib" || true
@@ -64,9 +70,10 @@ jobs:
           set -e
           fail=0
           check() {
-            plat=$(otool -l "$1" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
-            echo "  $(basename "$1"): $plat"
-            echo "$plat" | grep -qi "tvos\|platform 3" || { echo "    ^ NOT tvOS"; fail=1; }
+            echo "  --- $(basename "$1")"
+            lc=$(otool -l "$1" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN_TVOS" || true)
+            echo "$lc"
+            echo "$lc" | grep -qiE "LC_VERSION_MIN_TVOS|platform 3|platform tvos" || { echo "    ^ NOT tvOS"; fail=1; }
           }
           check src/MeloTV/Frameworks/Ryujinx.Headless.SDL2.dylib
           check src/MeloTV/Frameworks/libMoltenVK.dylib
