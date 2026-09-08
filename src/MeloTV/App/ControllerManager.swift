@@ -1,5 +1,6 @@
 import Foundation
 import GameController
+import os
 
 /// Feeds a physical controller straight into the core through its native gamepad
 /// API. There is no touch input on tvOS and no on-screen pad, so this is the only
@@ -21,6 +22,30 @@ final class ControllerManager: ObservableObject {
 
     private init() {}
 
+    private static let logger = OSLog(subsystem: "com.melotv.app", category: "input")
+
+    private static func log(_ message: String) {
+        os_log("%{public}s", log: logger, type: .default, "[input] " + message)
+    }
+
+    /// Describes everything GameController can see, so a missing pad is diagnosable
+    /// from the log rather than by inference.
+    func logConnectedControllers() {
+        let all = GCController.controllers()
+        if all.isEmpty {
+            Self.log("no controllers connected")
+            return
+        }
+        for c in all {
+            var kinds: [String] = []
+            if c.extendedGamepad != nil { kinds.append("extendedGamepad") }
+            if c.microGamepad != nil { kinds.append("microGamepad") }
+            let name = c.vendorName ?? "unnamed"
+            let category = c.productCategory
+            Self.log("controller: \(name) [\(category)] profiles=\(kinds.joined(separator: ",")) usable=\(c.extendedGamepad != nil)")
+        }
+    }
+
     func begin() {
         NotificationCenter.default.addObserver(
             forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] note in
@@ -30,12 +55,20 @@ final class ControllerManager: ObservableObject {
             forName: .GCControllerDidDisconnect, object: nil, queue: .main) { [weak self] _ in
                 self?.detach()
             }
-        attach(GCController.controllers().first)
+        logConnectedControllers()
+
+        // Pick the first controller that has a full gamepad profile. The Siri Remote
+        // exposes only microGamepad and cannot drive a Switch title, so it is skipped
+        // here on purpose -- it still drives the interface through the focus engine.
+        attach(GCController.controllers().first { $0.extendedGamepad != nil })
     }
 
     private func attach(_ controller: GCController?) {
         guard let controller, current == nil else { return }
-        guard let pad = controller.extendedGamepad else { return }   // ignore the bare Siri Remote
+        guard let pad = controller.extendedGamepad else {
+            Self.log("ignoring \(controller.vendorName ?? "unnamed"): no extendedGamepad profile")
+            return
+        }
 
         // Any stable non-null pointer works; the core uses it purely as identity.
         let id = UnsafeMutableRawPointer(bitPattern: ControllerManager.gamepadIdValue)
@@ -44,6 +77,7 @@ final class ControllerManager: ObservableObject {
         lock.lock(); token = id; lock.unlock()
         current = controller
         connectedName = controller.vendorName
+        Self.log("attached \(controller.vendorName ?? "unnamed") as input id \(Self.gamepadIdString)")
 
         pad.valueChangedHandler = { [weak self] pad, _ in
             self?.push(pad)
@@ -57,6 +91,7 @@ final class ControllerManager: ObservableObject {
         lock.unlock()
         current = nil
         connectedName = nil
+        Self.log("controller detached")
     }
 
     // Index order matches the core's ButtonMapping table exactly.

@@ -1,5 +1,6 @@
 ﻿using Ryujinx.Common.Logging.Formatters;
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace Ryujinx.Common.Logging.Targets
@@ -38,6 +39,13 @@ namespace Ryujinx.Common.Logging.Targets
 
         private static bool _publicLogUnavailable;
 
+        /// <summary>
+        /// The real stdout, captured before Console is redirected into Logger on Apple
+        /// targets. Writing to Console from inside a log target would otherwise feed
+        /// straight back into Logger and recurse forever.
+        /// </summary>
+        public static TextWriter AppleFallbackWriter { get; set; }
+
         private static void LogPublic(string line)
         {
             if (_publicLogUnavailable)
@@ -67,6 +75,10 @@ namespace Ryujinx.Common.Logging.Targets
                     // Emitting to stdout as well would duplicate every line, and the
                     // stdout copy is the one the unified log redacts to <private>.
                     LogPublic(line);
+                }
+                else if (AppleFallbackWriter != null)
+                {
+                    AppleFallbackWriter.WriteLine(line);
                 }
                 else
                 {

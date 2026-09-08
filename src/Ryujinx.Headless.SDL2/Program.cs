@@ -105,15 +105,20 @@ namespace Ryujinx.Headless.SDL2
                 for (int i = 0; i < argCount; i++)
                 {
                     args[i] = Marshal.PtrToStringAnsi(pArgs[i]);
-
-                    Console.WriteLine(args[i]);
                 }
+
+                Logger.Notice.Print(LogClass.Application, "Launch arguments: " + string.Join(' ', args));
 
                 Main(args);
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                // This is the -1 that the Swift side reports as "exited with code -1".
+                // It used to Console.WriteLine the exception, which on Apple targets
+                // goes through NSLog and is redacted to <private> -- so the one message
+                // that explains a failed boot was the one message that could not be
+                // read.
+                Logger.Error?.Print(LogClass.Application, $"Emulator failed: {e}");
                 return -1;
             }
 
@@ -482,6 +487,17 @@ namespace Ryujinx.Headless.SDL2
         {
             try
             {
+                // Before anything writes to Console: on Apple targets it goes through
+                // NSLog, whose os_log copy is redacted. Routing it into Logger is what
+                // makes a failed boot legible.
+                if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+                {
+                    ConsoleLogTarget.AppleFallbackWriter = Console.Out;
+
+                    Console.SetOut(new LoggerTextWriter("stdout"));
+                    Console.SetError(new LoggerTextWriter("stderr"));
+                }
+
                 // Must run before anything can P/Invoke a bundled library.
                 AppleNativeLibraries.Register();
 
