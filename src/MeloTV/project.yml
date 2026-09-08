@@ -54,13 +54,12 @@ targets:
         # Lets a paired DualSense drive the interface, not just gameplay.
         GCSupportsControllerUserInteraction: true
         GCSupportsMultipleMicroGamepads: true
-    entitlements:
-      path: App/MeloTV.entitlements
-      properties:
-        # Documented for tvOS 14+. Ryujinx reserves a large guest address space,
-        # which needs this. Requires a paid account -- if the profile will not
-        # carry it, the build still runs, it just has less address space.
-        com.apple.developer.kernel.extended-virtual-addressing: true
+    # No entitlements are requested. extended-virtual-addressing needs a paid
+    # account, and requesting an entitlement the provisioning profile cannot
+    # grant makes the install itself fail. It is also not needed here: Apple
+    # silicon uses 16 KB pages, and the core only takes the giant flat address
+    # space reservation when the host page size is <= 4 KB. On this hardware it
+    # goes down the host-tracked path instead, which does not need it.
     dependencies:
       - target: RyujinxHelper
         embed: true
