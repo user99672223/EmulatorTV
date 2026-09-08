@@ -65,14 +65,24 @@ targets:
         embed: true
         codeSign: false
       # Dropped in by CI from the tvos-core and tvos-deps workflow artifacts.
+      #
+      # The core dylib IS linked: the Swift side binds its exports by
+      # @_silgen_name, so those symbols must resolve at link time.
       - framework: Frameworks/Ryujinx.Headless.SDL2.dylib
         embed: true
         codeSign: false
+      # SDL2 and MoltenVK are NOT linked. Nothing in Swift calls them; the core
+      # dlopens SDL2 via DllImport("SDL2") and reaches Vulkan through Silk.NET's
+      # loader, both at runtime. Listing them as link dependencies makes Xcode
+      # emit -lSDL2 / -lMoltenVK and the link fails with "library not found".
+      # They only need to be present in the bundle.
       - framework: Frameworks/SDL2.framework
         embed: true
+        link: false
         codeSign: false
       - framework: Frameworks/libMoltenVK.dylib
         embed: true
+        link: false
         codeSign: false
       - sdk: GameController.framework
       - sdk: Metal.framework
