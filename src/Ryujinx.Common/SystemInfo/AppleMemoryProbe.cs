@@ -1,4 +1,4 @@
-using Ryujinx.Common.Logging;
+﻿using Ryujinx.Common.Logging;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -27,6 +27,25 @@ namespace Ryujinx.Common.SystemInfo
         /// </summary>
         [DllImport(SystemLib, EntryPoint = "os_proc_available_memory")]
         private static extern nuint OsProcAvailableMemory();
+
+        // task_info(TASK_VM_INFO) exposes phys_footprint, which is the figure jetsam
+        // actually meters against the per-process limit -- closer to the truth than
+        // resident_size, which excludes compressed pages and some IOKit mappings.
+        [DllImport(SystemLib, EntryPoint = "task_info")]
+        private static extern int TaskInfo(uint task, uint flavor, IntPtr info, ref uint count);
+
+        [DllImport(SystemLib, EntryPoint = "task_self_trap")]
+        private static extern uint TaskSelfTrap();
+
+        private const uint TaskVmInfo = 22;
+
+        // Byte offset of phys_footprint within task_vm_info_data_t: 19 fields precede
+        // it, of which region_count and page_size are 4 bytes and the rest 8.
+        private const int PhysFootprintOffset = 144;
+
+        // Buffer generously; the struct has grown across SDK revisions and task_info
+        // writes back the count it actually filled.
+        private const int TaskVmInfoBufferBytes = 512;
 
         private const double Mib = 1024.0 * 1024.0;
 
@@ -81,6 +100,13 @@ namespace Ryujinx.Common.SystemInfo
             if (_baselineAvailable < 0 && available >= 0)
             {
                 _baselineAvailable = available;
+
+                if (workingSet > 0)
+                {
+                    Logger.Notice.Print(LogClass.Application,
+                        $"[MEM] process memory limit looks like {(available + workingSet) / Mib:F0} MiB " +
+                        $"(available {available / Mib:F1} + footprint {workingSet / Mib:F1})");
+                }
             }
 
             string availableText = available >= 0
@@ -103,8 +129,70 @@ namespace Ryujinx.Common.SystemInfo
                 $"[MEM] {stage,-32} available {availableText}   resident {usedText}   managed {managed / Mib,7:F1} MiB{deltaText}");
         }
 
+        /// <summary>
+        /// Physical footprint in bytes as metered by jetsam, or -1 if unavailable.
+        /// Added to <see cref="AvailableBytes"/> this recovers the process's actual
+        /// memory limit, which Apple does not publish for any tvOS device.
+        /// </summary>
+        public static long PhysFootprintBytes()
+        {
+            if (!IsSupported)
+            {
+                return -1;
+            }
+
+            IntPtr buffer = Marshal.AllocHGlobal(TaskVmInfoBufferBytes);
+
+            try
+            {
+                for (int i = 0; i < TaskVmInfoBufferBytes; i += 8)
+                {
+                    Marshal.WriteInt64(buffer, i, 0);
+                }
+
+                uint count = TaskVmInfoBufferBytes / sizeof(uint);
+
+                if (TaskInfo(TaskSelfTrap(), TaskVmInfo, buffer, ref count) != 0)
+                {
+                    return -1;
+                }
+
+                // Older kernels return a struct that stops short of phys_footprint.
+                if (count * sizeof(uint) < PhysFootprintOffset + sizeof(long))
+                {
+                    return -1;
+                }
+
+                long footprint = Marshal.ReadInt64(buffer, PhysFootprintOffset);
+
+                // Sanity check rather than trust the offset blindly: any real answer is
+                // well above a megabyte and well under the 4 GiB this hardware has.
+                if (footprint < 1 * 1024 * 1024 || footprint > 8L * 1024 * 1024 * 1024)
+                {
+                    return -1;
+                }
+
+                return footprint;
+            }
+            catch
+            {
+                return -1;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+
         private static long SafeWorkingSet()
         {
+            long footprint = PhysFootprintBytes();
+
+            if (footprint > 0)
+            {
+                return footprint;
+            }
+
             try
             {
                 return Environment.WorkingSet;

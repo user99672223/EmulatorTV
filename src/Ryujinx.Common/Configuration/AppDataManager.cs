@@ -54,7 +54,16 @@ namespace Ryujinx.Common.Configuration
             {
                 appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support");
             }
-            else if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
+            else if (OperatingSystem.IsTvOS())
+            {
+                // tvOS is not iOS here. Documents and Application Support are
+                // sandbox-denied on real Apple TV hardware (they only succeed in the
+                // Simulator, which is a trap); Library/Caches and tmp are the only
+                // directories an app may write to. Caches is purgeable by the OS, so
+                // anything put here has to be treated as replaceable.
+                appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Caches");
+            }
+            else if (OperatingSystem.IsIOS())
             {
                 appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             }
