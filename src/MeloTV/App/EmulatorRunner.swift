@@ -12,7 +12,7 @@ final class EmulatorRunner: ObservableObject {
     /// Boots a title. The core's main loop blocks for the lifetime of the game,
     /// so it gets its own thread with a large stack; the UI thread stays free to
     /// service the SDL main-thread dispatcher the core installs on Apple targets.
-    func start(game: URL, applicationPoolMiB: Int) {
+    func start(game: URL, applicationPoolMiB: Int, dramMiB: Int = 3072) {
         guard !isRunning else { return }
         isRunning = true
         lastMessage = nil
@@ -41,6 +41,15 @@ final class EmulatorRunner: ObservableObject {
 
         if applicationPoolMiB > 0 {
             args += ["--application-pool-mib", String(applicationPoolMiB)]
+        }
+
+        // The emulated DRAM is reserved as one contiguous block of address space. At
+        // the stock 4096 MiB, that block plus the JIT caches plus the host-tracked page
+        // table overran the address space this process is allowed without the
+        // extended-virtual-addressing entitlement, which a free developer account
+        // cannot be granted. The pools still fit comfortably inside 3 GiB.
+        if dramMiB > 0 {
+            args += ["--dram-mib", String(dramMiB)]
         }
 
         // Without an --input-id-N the core's Load() finds no configured player and

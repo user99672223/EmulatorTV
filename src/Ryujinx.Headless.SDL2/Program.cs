@@ -1477,6 +1477,14 @@ namespace Ryujinx.Headless.SDL2
                     $"Application memory pool overridden to {option.ApplicationPoolMiB} MiB.");
             }
 
+            if (option.DramMiB > 0)
+            {
+                MemoryTuning.DramSizeBytes = (ulong)option.DramMiB * 1024 * 1024;
+
+                Logger.Notice.Print(LogClass.Application,
+                    $"Emulated DRAM overridden to {option.DramMiB} MiB.");
+            }
+
             _libHacHorizonManager = new LibHacHorizonManager();
             _libHacHorizonManager.InitializeFsServer(_virtualFileSystem);
             _libHacHorizonManager.InitializeArpServer();

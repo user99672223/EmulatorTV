@@ -1,4 +1,4 @@
-using Ryujinx.HLE.HOS.Kernel.Common;
+﻿using Ryujinx.HLE.HOS.Kernel.Common;
 using System;
 
 namespace Ryujinx.HLE
@@ -48,6 +48,11 @@ namespace Ryujinx.HLE
 
         public static ulong ToDramSize(this MemoryConfiguration configuration)
         {
+            if (MemoryTuning.DramSizeBytes is ulong overridden)
+            {
+                return overridden;
+            }
+
             return configuration switch
             {
                 MemoryConfiguration.MemoryConfiguration4GiB or

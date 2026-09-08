@@ -1,4 +1,4 @@
-namespace Ryujinx.HLE
+﻿namespace Ryujinx.HLE
 {
     /// <summary>
     /// Host-side overrides for the guest memory layout.
@@ -20,5 +20,18 @@ namespace Ryujinx.HLE
         /// kernel initialisation.
         /// </summary>
         public static ulong? ApplicationPoolSizeBytes { get; set; }
+
+        /// <summary>
+        /// Overrides the emulated DRAM size, in bytes. When null the size comes from
+        /// the selected <see cref="MemoryConfiguration"/> as usual.
+        ///
+        /// This is a virtual-address concern rather than a resident-memory one. The
+        /// guest DRAM is reserved as one MemoryBlock, and on a host without the
+        /// extended-virtual-addressing entitlement the address space runs out well
+        /// before physical memory does: a 4 GiB reservation plus the JIT caches plus
+        /// the host-tracked page table exceeded the limit and mmap returned ENOMEM
+        /// while 2 GB of jetsam headroom was still free.
+        /// </summary>
+        public static ulong? DramSizeBytes { get; set; }
     }
 }

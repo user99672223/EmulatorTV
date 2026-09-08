@@ -48,6 +48,14 @@ struct MeloTVApp: App {
             // and it is used by the JIT cache, the translator AND the SIGSEGV handler
             // that host-tracked memory depends on.
             ("DUAL_MAPPED_JIT", "1"),
+
+            // Address space, not resident memory, is the binding constraint here: a
+            // 1 GiB + 256 MiB JIT reservation on top of guest DRAM and the
+            // host-tracked page table exhausted it, and mmap returned ENOMEM with 2 GB
+            // of jetsam headroom still free. These are caches, so a smaller reservation
+            // costs eviction churn rather than correctness.
+            ("JIT_SHARED_CACHE_MIB", "256"),
+            ("JIT_LOCAL_CACHE_MIB", "64"),
         ]
 
         for (key, value) in vars {

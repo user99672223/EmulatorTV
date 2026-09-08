@@ -11,8 +11,26 @@ namespace Ryujinx.Cpu.LightningJit.Cache
     class DualMappedNoWxCache : IDisposable
     {
         private const int CodeAlignment = 4; // Bytes.
-        private ulong SharedCacheSize = DualMappedJitAllocator.hasTXM ? (ulong)512 * 1024 * 1024 : 1024 * 1024 * 1024;
-        private ulong LocalCacheSize = 256 * 1024 * 1024;
+        // These are address-space reservations, not resident memory, but address space
+        // is the scarce resource on a host without extended-virtual-addressing: the
+        // 1 GiB default plus guest DRAM plus the host-tracked page table exhausted it.
+        // JIT_SHARED_CACHE_MIB / JIT_LOCAL_CACHE_MIB override the defaults.
+        private static ulong CacheSizeFromEnv(string variable, ulong defaultMiB)
+        {
+            string value = Environment.GetEnvironmentVariable(variable);
+
+            if (ulong.TryParse(value, out ulong mib) && mib > 0)
+            {
+                return mib * 1024 * 1024;
+            }
+
+            return defaultMiB * 1024 * 1024;
+        }
+
+        private ulong SharedCacheSize = CacheSizeFromEnv(
+            "JIT_SHARED_CACHE_MIB",
+            DualMappedJitAllocator.hasTXM ? 512ul : 1024ul);
+        private ulong LocalCacheSize = CacheSizeFromEnv("JIT_LOCAL_CACHE_MIB", 256ul);
 
         // How many calls to the same function we allow until we pad the shared cache to force the function to become available there
         // and allow the guest to take the fast path.

@@ -72,6 +72,13 @@ namespace Ryujinx.HLE.HOS.Kernel.Common
 
         public static ulong GetDramSize(MemorySize size)
         {
+            // Must match MemoryConfigurationExtensions.ToDramSize, or the pools would
+            // be carved from a different size than the block that backs them.
+            if (MemoryTuning.DramSizeBytes is ulong overridden)
+            {
+                return overridden;
+            }
+
             return size switch
             {
                 MemorySize.MemorySize4GiB => 4 * GiB,

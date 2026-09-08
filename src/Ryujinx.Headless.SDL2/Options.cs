@@ -297,6 +297,9 @@ namespace Ryujinx.Headless.SDL2
         [Option("application-pool-mib", Required = false, Default = 0, HelpText = "Size of the guest application memory pool in MiB. 0 uses the value implied by the memory configuration (3285 MiB on a stock 4GiB system). Lower this on memory constrained hosts so the guest sizes its heaps to fit.")]
         public int ApplicationPoolMiB { get; set; }
 
+        [Option("dram-mib", Required = false, Default = 0, HelpText = "Size of the emulated DRAM in MiB. 0 uses the memory configuration's value (4096). This is reserved as one contiguous block of address space, so lowering it is how to fit on a host that lacks extended virtual addressing.")]
+        public int DramMiB { get; set; }
+
         [Option("ignore-missing-services", Required = false, Default = false, HelpText = "Enable ignoring missing services.")]
         public bool IgnoreMissingServices { get; set; }
 

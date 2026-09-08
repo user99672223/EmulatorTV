@@ -7,11 +7,13 @@ struct ContentView: View {
     @ObservedObject private var uploads = UploadServer.shared
 
     @State private var selected: StoredFile?
-    @State private var poolMiB: Int = 0     // 0 == leave the core's default alone
+    // 1536 by default rather than the stock 3285: the pools have to fit inside the
+    // reduced DRAM, and the measured desktop peak for this title was about 1200 MiB.
+    @State private var poolMiB: Int = 1536
     @State private var note: String?
 
     private let poolChoices: [(String, Int)] = [
-        ("Default (3285 MiB)", 0), ("1536 MiB", 1536), ("1280 MiB", 1280), ("1024 MiB", 1024),
+        ("1536 MiB", 1536), ("1280 MiB", 1280), ("1024 MiB", 1024), ("Stock (3285 MiB)", 0),
     ]
 
     var body: some View {
