@@ -118,7 +118,9 @@ namespace Ryujinx.Headless.SDL2
                 // goes through NSLog and is redacted to <private> -- so the one message
                 // that explains a failed boot was the one message that could not be
                 // read.
-                Logger.Error?.Print(LogClass.Application, $"Emulator failed: {e}");
+                // Notice, not Error: Notice cannot be disabled, and this is the one
+                // message that explains a failed boot.
+                Logger.Notice.Print(LogClass.Application, $"Emulator failed: {e}");
                 return -1;
             }
 
@@ -509,7 +511,7 @@ namespace Ryujinx.Headless.SDL2
                 // process with no message at all, which is how the first tvOS launch
                 // failure presented: SIGABRT and an unsymbolicated backtrace. Log it
                 // first so the reason survives.
-                Logger.Error?.Print(LogClass.Application, $"initialize failed: {ex}");
+                Logger.Notice.Print(LogClass.Application, $"initialize failed: {ex}");
                 throw;
             }
         }
@@ -1586,7 +1588,14 @@ namespace Ryujinx.Headless.SDL2
             Logger.SetEnable(LogLevel.Stub, !option.LoggingDisableStub);
             Logger.SetEnable(LogLevel.Info, !option.LoggingDisableInfo);
             Logger.SetEnable(LogLevel.Warning, !option.LoggingDisableWarning);
-            Logger.SetEnable(LogLevel.Error, option.LoggingEnableError);
+            // The option is declared [Option("disable-error-logs")] but is bound to a
+            // property called LoggingEnableError and was used without negation, so NOT
+            // passing the disable flag turned error logging off. Every other Disable*
+            // option in this block negates. The effect was that from this point on
+            // Logger.Error was null and every Logger.Error?.Print(...) in the codebase
+            // silently did nothing -- including the one reporting why a game boot
+            // failed.
+            Logger.SetEnable(LogLevel.Error, !option.LoggingEnableError);
             Logger.SetEnable(LogLevel.Trace, option.LoggingEnableTrace);
             Logger.SetEnable(LogLevel.Guest, !option.LoggingDisableGuest);
             Logger.SetEnable(LogLevel.AccessLog, option.LoggingEnableFsAccessLog);

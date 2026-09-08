@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 final class EmulatorRunner: ObservableObject {
     static let shared = EmulatorRunner()
@@ -49,8 +50,11 @@ final class EmulatorRunner: ObservableObject {
         args += ["--input-id-1", ControllerManager.gamepadIdString]
         args += ["--controller-type-1", "ProController"]
 
+        EmulatorRunner.log("starting: " + args.joined(separator: " "))
+
         let thread = Thread {
             let result = RyujinxBridge.mainRyu(argv: args)
+            EmulatorRunner.log("main_ryujinx_sdl returned \(result)")
             DispatchQueue.main.async {
                 EmulatorRunner.shared.isRunning = false
                 EmulatorRunner.shared.lastMessage = "Emulator exited with code \(result)."
@@ -59,6 +63,12 @@ final class EmulatorRunner: ObservableObject {
         thread.name = "ryujinx-main"
         thread.stackSize = 16 * 1024 * 1024
         thread.start()
+    }
+
+    private static let logger = OSLog(subsystem: "com.melotv.app", category: "emulator")
+
+    static func log(_ message: String) {
+        os_log("%{public}s", log: logger, type: .default, "[run] " + message)
     }
 
     func stop() {
