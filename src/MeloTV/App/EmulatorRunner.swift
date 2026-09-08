@@ -42,6 +42,13 @@ final class EmulatorRunner: ObservableObject {
             args += ["--application-pool-mib", String(applicationPoolMiB)]
         }
 
+        // Without an --input-id-N the core's Load() finds no configured player and
+        // returns before it creates a window or an emulation context, so nothing
+        // boots and main_ryujinx_sdl just returns 0. The id must match the pointer
+        // ControllerManager hands to attach_gamepad.
+        args += ["--input-id-1", ControllerManager.gamepadIdString]
+        args += ["--controller-type-1", "ProController"]
+
         let thread = Thread {
             let result = RyujinxBridge.mainRyu(argv: args)
             DispatchQueue.main.async {

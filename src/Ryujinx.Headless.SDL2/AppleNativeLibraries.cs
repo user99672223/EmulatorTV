@@ -81,6 +81,58 @@ namespace Ryujinx.Headless.SDL2
             TryRegister(typeof(HLE.Switch).Assembly, resolver, "Ryujinx.HLE");
             TryRegister(typeof(Input.IGamepad).Assembly, resolver, "Ryujinx.Input");
             TryRegister(typeof(Memory.MemoryBlock).Assembly, resolver, "Ryujinx.Memory");
+
+            RegisterSilkVulkanResolver(frameworks);
+
+            // Vk.GetApi() is reached from the MoltenVKWindow constructor, which runs
+            // before VulkanRenderer calls MVKInitialization.Initialize -- the only
+            // MoltenVK import that goes through the resolver above. Loading the image
+            // here means that even a bare dlopen("libMoltenVK.dylib") matches an
+            // already-loaded image, whichever path asks for it first.
+            string moltenVk = Path.Combine(frameworks, "libMoltenVK.dylib");
+
+            if (NativeLibrary.TryLoad(moltenVk, out _))
+            {
+                Logger.Info?.Print(LogClass.Application, "Preloaded MoltenVK.");
+            }
+            else
+            {
+                Logger.Warning?.Print(LogClass.Application, $"Could not preload MoltenVK from {moltenVk}");
+            }
+        }
+
+        /// <summary>
+        /// Silk.NET does not load through DllImport, so a DllImportResolver never sees
+        /// its requests: Vk.GetApi() goes through Silk.NET.Core.Loader.PathResolver,
+        /// which probes AppContext.BaseDirectory and the main module's directory. Both
+        /// are the bundle root, while the library is in Frameworks/, so every candidate
+        /// misses. This points its resolver straight at the bundled MoltenVK.
+        /// </summary>
+        private static void RegisterSilkVulkanResolver(string frameworks)
+        {
+            try
+            {
+                string moltenVk = Path.Combine(frameworks, "libMoltenVK.dylib");
+
+                if (Silk.NET.Core.Loader.PathResolver.Default is Silk.NET.Core.Loader.DefaultPathResolver def)
+                {
+                    def.Resolvers.Insert(0, name =>
+                    {
+                        string leaf = Path.GetFileName(name);
+
+                        return leaf is "libvulkan.dylib" or "libvulkan.1.dylib" or "libvulkan.so.1"
+                            or "libMoltenVK.dylib" or "vulkan" or "vulkan-1.dll"
+                            ? new[] { moltenVk }
+                            : Array.Empty<string>();
+                    });
+
+                    Logger.Info?.Print(LogClass.Application, "Installed a Silk.NET Vulkan path resolver.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning?.Print(LogClass.Application, $"Could not install the Silk.NET Vulkan resolver: {ex.Message}");
+            }
         }
 
         private static void TryRegister(Assembly assembly, DllImportResolver resolver, string label)

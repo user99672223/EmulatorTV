@@ -9,6 +9,12 @@ final class ControllerManager: ObservableObject {
 
     @Published private(set) var connectedName: String?
 
+    /// The core turns the pointer handed to attach_gamepad into its input id with
+    /// idPtr.ToInt64().ToString("X"), so this value and the --input-id-N argument
+    /// have to agree. Kept here so it is defined once.
+    static let gamepadIdValue: UInt = 1
+    static var gamepadIdString: String { String(gamepadIdValue, radix: 16, uppercase: true) }
+
     private let lock = NSLock()
     private var token: UnsafeMutableRawPointer?
     private var current: GCController?
@@ -32,7 +38,7 @@ final class ControllerManager: ObservableObject {
         guard let pad = controller.extendedGamepad else { return }   // ignore the bare Siri Remote
 
         // Any stable non-null pointer works; the core uses it purely as identity.
-        let id = UnsafeMutableRawPointer(bitPattern: UInt(1))
+        let id = UnsafeMutableRawPointer(bitPattern: ControllerManager.gamepadIdValue)
         RyujinxBridge.attachGamepad(id, controller.vendorName ?? "Controller")
 
         lock.lock(); token = id; lock.unlock()

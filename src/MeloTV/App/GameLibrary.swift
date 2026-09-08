@@ -25,13 +25,31 @@ final class GameLibrary: ObservableObject {
     var hasKeys: Bool { FileManager.default.fileExists(atPath: Paths.prodKeys.path) }
     var hasFirmware: Bool { !(firmwareVersion ?? "").isEmpty }
 
-    /// Everything that must be present before a boot can possibly succeed.
-    var missing: [String] {
+    /// Without these a boot cannot even be attempted.
+    var blocking: [String] {
         var m: [String] = []
         if !hasKeys { m.append("prod.keys (put it in Library/Caches/system/)") }
-        if !hasFirmware { m.append("Switch firmware (not installed)") }
         if games.isEmpty { m.append("a game (.nsp / .xci / .nca)") }
         return m
+    }
+
+    /// Firmware is deliberately NOT blocking. It only reads as installed once its
+    /// NCAs have been registered by install_firmware, so gating Start on it made the
+    /// button impossible to enable -- and a disabled button on tvOS cannot even take
+    /// focus, which left the remote with nowhere to go.
+    var warnings: [String] {
+        hasFirmware ? [] : ["Switch firmware is not installed; most games will not boot"]
+    }
+
+    /// Firmware archives sitting in the data directory, ready to be installed.
+    var installableFirmware: [StoredFile] {
+        files.filter { ["zip", "xci"].contains($0.url.pathExtension.lowercased()) }
+    }
+
+    func installFirmware(_ file: StoredFile) -> String {
+        let result = RyujinxBridge.installFirmware(at: file.url.path)
+        refresh()
+        return result.isError ? "Firmware install failed: \(result.string)" : "Installed firmware \(result.string)"
     }
 
     func refresh() {

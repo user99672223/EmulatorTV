@@ -7,6 +7,7 @@ struct ContentView: View {
 
     @State private var selected: StoredFile?
     @State private var poolMiB: Int = 0     // 0 == leave the core's default alone
+    @State private var note: String?
 
     private let poolChoices: [(String, Int)] = [
         ("Default (3285 MiB)", 0), ("1536 MiB", 1536), ("1280 MiB", 1280), ("1024 MiB", 1024),
@@ -60,19 +61,39 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: 480)
 
+                // Deliberately never disabled: a disabled button cannot take focus on
+                // tvOS, so gating it would strand the remote with nothing to select.
+                // It reports what is missing instead.
                 Button {
+                    guard library.blocking.isEmpty else {
+                        note = "Cannot start - missing " + library.blocking.joined(separator: ", ")
+                        return
+                    }
                     if let game = selected ?? library.games.first {
                         runner.start(game: game.url, applicationPoolMiB: poolMiB)
                     }
                 } label: {
                     Label(startTitle, systemImage: "play.fill")
                 }
-                .disabled(!library.missing.isEmpty)
+
+                if let firmware = library.installableFirmware.first {
+                    Button {
+                        note = library.installFirmware(firmware)
+                    } label: {
+                        Label("Install firmware from \(firmware.name)", systemImage: "square.and.arrow.down")
+                    }
+                }
 
                 Button {
                     library.refresh()
+                    note = nil
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
+                }
+
+                if let note {
+                    Text(note).font(.footnote).foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if let msg = runner.lastMessage {
@@ -100,8 +121,8 @@ struct ContentView: View {
             row("Controller" + (controllers.connectedName.map { ": \($0)" } ?? ""),
                 controllers.connectedName != nil)
 
-            if !library.missing.isEmpty {
-                Text("Missing: " + library.missing.joined(separator: ", "))
+            ForEach(library.blocking + library.warnings, id: \.self) { item in
+                Text(item)
                     .font(.footnote)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)

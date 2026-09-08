@@ -645,7 +645,13 @@ namespace Ryujinx.Graphics.Vulkan
                 Format.Bc7Srgb,
                 Format.Bc7Unorm);
 
-            if (!OperatingSystem.IsIOSVersionAtLeast(16, 4))
+            // IsIOSVersionAtLeast returns false on tvOS because tvOS is not iOS, so a
+            // bare negation disabled BC everywhere off-iOS -- including tvOS 27, where
+            // MoltenVK does support it. Losing BC forces every compressed guest texture
+            // to be decoded on the CPU into RGBA8, a 4-8x memory blowup that this
+            // 2 GB-capped target cannot afford.
+            if ((OperatingSystem.IsIOS() && !OperatingSystem.IsIOSVersionAtLeast(16, 4)) ||
+                (OperatingSystem.IsTvOS() && !OperatingSystem.IsTvOSVersionAtLeast(16, 4)))
             {
                 // On iOS 16.3.1 and earlier, these formats are not supported.
                 supportsBc123CompressionFormat = false;
