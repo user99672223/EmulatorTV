@@ -4,6 +4,10 @@ import os
 @main
 struct MeloTVApp: App {
     init() {
+        // First, so the core's SIGSEGV handler chains back to this one rather than
+        // replacing it. A native fault currently leaves nothing in the log at all.
+        CrashReporter.install()
+
         Paths.ensureDirectories()
 
         // Every one of these has to be set before initialize(), because the core
