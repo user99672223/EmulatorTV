@@ -1,0 +1,112 @@
+name: tvOS app (IPA)
+
+# Milestone 1, steps 3-4: assemble the tvOS app and emit an unsigned IPA.
+#
+# The native pieces are NOT rebuilt here. They come from the most recent
+# successful runs of tvos-core.yml and tvos-deps.yml, because a MoltenVK build
+# is long and macOS runner minutes on a private repo are billed at 10x.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tvos]
+    paths:
+      - 'src/MeloTV/**'
+      - '.github/workflows/tvos-app.yml'
+
+jobs:
+  app:
+    name: MeloTV -> unsigned IPA
+    runs-on: macos-15
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull native dependencies from earlier runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eo pipefail
+          mkdir -p incoming
+          for name in Ryujinx-tvos-arm64-dylib SDL2-tvos-arm64 MoltenVK-tvos; do
+            echo "--- $name"
+            gh run download -R "$GITHUB_REPOSITORY" --name "$name" --dir "incoming/$name" \
+              || { echo "MISSING ARTIFACT: $name -- run tvos-core.yml / tvos-deps.yml first"; exit 1; }
+          done
+          find incoming -maxdepth 4 | head -40
+
+      - name: Stage frameworks
+        run: |
+          set -eo pipefail
+          DEST=src/MeloTV/Frameworks
+          mkdir -p "$DEST"
+
+          DYLIB=$(find incoming -name "Ryujinx.Headless.SDL2.dylib" | head -1)
+          SDL=$(find incoming -name "SDL2.framework" -type d | head -1)
+          MVK=$(find incoming -name "libMoltenVK.dylib" | head -1)
+          echo "core : $DYLIB"; echo "sdl2 : $SDL"; echo "mvk  : $MVK"
+          [ -n "$DYLIB" ] && [ -n "$SDL" ] && [ -n "$MVK" ] || { echo "a dependency is missing"; exit 1; }
+
+          cp "$DYLIB" "$DEST/"
+          cp "$MVK"   "$DEST/"
+          rm -rf "$DEST/SDL2.framework"; cp -R "$SDL" "$DEST/"
+
+          # dlopen has to find these by @rpath from inside the bundle.
+          install_name_tool -id @rpath/Ryujinx.Headless.SDL2.dylib "$DEST/Ryujinx.Headless.SDL2.dylib" || true
+          install_name_tool -id @rpath/libMoltenVK.dylib "$DEST/libMoltenVK.dylib" || true
+          ls -la "$DEST"
+
+      - name: Confirm every staged binary is tvOS
+        run: |
+          set -e
+          fail=0
+          check() {
+            plat=$(otool -l "$1" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
+            echo "  $(basename "$1"): $plat"
+            echo "$plat" | grep -qi "tvos\|platform 3" || { echo "    ^ NOT tvOS"; fail=1; }
+          }
+          check src/MeloTV/Frameworks/Ryujinx.Headless.SDL2.dylib
+          check src/MeloTV/Frameworks/libMoltenVK.dylib
+          check src/MeloTV/Frameworks/SDL2.framework/SDL2
+          [ "$fail" = "0" ] || { echo "refusing to build an app around an iOS binary"; exit 1; }
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: cd src/MeloTV && xcodegen generate
+
+      - name: Build (appletvos, unsigned)
+        run: |
+          set -eo pipefail
+          cd src/MeloTV
+          xcodebuild \
+            -project MeloTV.xcodeproj \
+            -scheme MeloTV \
+            -configuration Release \
+            -sdk appletvos \
+            -derivedDataPath build \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          set -eo pipefail
+          APP=$(find src/MeloTV/build -name "MeloTV.app" -type d | head -1)
+          echo "app: $APP"
+          [ -n "$APP" ] || { echo "no .app produced"; exit 1; }
+          rm -rf payload && mkdir -p payload/Payload
+          cp -R "$APP" payload/Payload/
+          cd payload && zip -qry ../MeloTV-tvos-unsigned.ipa Payload
+          cd .. && ls -la MeloTV-tvos-unsigned.ipa
+          unzip -l MeloTV-tvos-unsigned.ipa | tail -20
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MeloTV-unsigned-ipa
+          path: MeloTV-tvos-unsigned.ipa
+          if-no-files-found: error

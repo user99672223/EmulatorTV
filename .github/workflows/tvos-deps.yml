@@ -27,7 +27,7 @@ jobs:
 
       - name: Build Framework-tvOS (device, arm64)
         run: |
-          set -eo pipefail
+          set -e
           cd sdl
           xcodebuild \
             -project Xcode/SDL/SDL.xcodeproj \
@@ -41,13 +41,14 @@ jobs:
 
       - name: Verify Mach-O platform is tvOS
         run: |
-          set -eo pipefail
+          set -e
           BIN=$(find sdl/out -path "*SDL2.framework/SDL2" -type f | head -1)
           echo "binary: $BIN"
+          [ -n "$BIN" ] || { echo "FAIL: no SDL2 binary produced"; exit 1; }
           file "$BIN"
-          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | head -12
-          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -qi "platform.*tvos\|platform 3" \
-            || { echo "FAIL: SDL2 is not a tvOS binary"; exit 1; }
+          PLAT=$(otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
+          echo "platform: $PLAT"
+          echo "$PLAT" | grep -qiE "tvos|platform 3" || { echo "FAIL: SDL2 is not a tvOS binary"; exit 1; }
           echo "OK: SDL2 built for tvOS"
 
       - uses: actions/upload-artifact@v4
@@ -64,34 +65,32 @@ jobs:
         run: git clone --depth 1 --branch "$MVK_TAG" https://github.com/KhronosGroup/MoltenVK.git mvk
 
       - name: Fetch dependencies (tvOS only)
-        run: |
-          cd mvk
-          ./fetchDependencies --tvos
+        run: cd mvk && ./fetchDependencies --tvos
 
       - name: Build for tvOS
-        run: |
-          cd mvk
-          make tvos
+        run: cd mvk && make tvos
 
       - name: Show what was produced
-        run: find mvk/Package -maxdepth 6 \( -name "*.dylib" -o -name "*.xcframework" -o -name "*.a" \) | head -30
+        run: find mvk/Package -maxdepth 9 \( -name "*.dylib" -o -name "*.a" \) -print
 
       - name: Verify Mach-O platform is tvOS
         run: |
-          set -eo pipefail
-          BIN=$(find mvk/Package -name "libMoltenVK.dylib" -path "*tvOS*" | head -1)
-          if [ -z "$BIN" ]; then BIN=$(find mvk/Package -name "libMoltenVK.dylib" | head -1); fi
+          set -e
+          # The dynamic dylib lives at
+          # Package/Release/MoltenVK/dynamic/MoltenVK.xcframework/tvos-arm64*/libMoltenVK.dylib,
+          # which is seven levels down -- deeper than a shallow maxdepth reaches.
+          BIN=$(find mvk/Package -name "libMoltenVK.dylib" -path "*dynamic*" | head -1)
+          [ -n "$BIN" ] || BIN=$(find mvk/Package -name "libMoltenVK.dylib" | head -1)
           echo "binary: $BIN"
+          [ -n "$BIN" ] || { echo "FAIL: no libMoltenVK.dylib produced"; exit 1; }
           file "$BIN"
-          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | head -12
-          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -qi "platform.*tvos\|platform 3" \
-            || { echo "FAIL: MoltenVK is not a tvOS binary"; exit 1; }
+          PLAT=$(otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
+          echo "platform: $PLAT"
+          echo "$PLAT" | grep -qiE "tvos|platform 3" || { echo "FAIL: MoltenVK is not a tvOS binary"; exit 1; }
           echo "OK: MoltenVK built for tvOS"
 
       - uses: actions/upload-artifact@v4
         with:
           name: MoltenVK-tvos
-          path: |
-            mvk/Package/Release/MoltenVK/dynamic/**/libMoltenVK.dylib
-            mvk/Package/Release/MoltenVK/MoltenVK.xcframework
+          path: mvk/Package/Release/MoltenVK/dynamic/MoltenVK.xcframework
           if-no-files-found: error
