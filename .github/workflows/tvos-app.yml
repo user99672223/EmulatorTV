@@ -105,7 +105,7 @@ jobs:
           cd .. && ls -la MeloTV-tvos-unsigned.ipa
           unzip -l MeloTV-tvos-unsigned.ipa | tail -20
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MeloTV-unsigned-ipa
           path: MeloTV-tvos-unsigned.ipa
