@@ -36,6 +36,7 @@ jobs:
             -sdk appletvos \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            TVOS_DEPLOYMENT_TARGET=13.0 \
             SYMROOT="$PWD/out" \
             build
 
@@ -46,9 +47,9 @@ jobs:
           echo "binary: $BIN"
           [ -n "$BIN" ] || { echo "FAIL: no SDL2 binary produced"; exit 1; }
           file "$BIN"
-          PLAT=$(otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
-          echo "platform: $PLAT"
-          echo "$PLAT" | grep -qiE "tvos|platform 3" || { echo "FAIL: SDL2 is not a tvOS binary"; exit 1; }
+          LC=$(otool -l "$BIN" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN_TVOS" || true)
+          echo "$LC"
+          echo "$LC" | grep -qiE "LC_VERSION_MIN_TVOS|platform 3|platform tvos"             || { echo "FAIL: SDL2 is not a tvOS binary"; exit 1; }
           echo "OK: SDL2 built for tvOS"
 
       - uses: actions/upload-artifact@v4
@@ -71,26 +72,34 @@ jobs:
         run: cd mvk && make tvos
 
       - name: Show what was produced
-        run: find mvk/Package -maxdepth 9 \( -name "*.dylib" -o -name "*.a" \) -print
+        run: find mvk/Package -maxdepth 9 \( -name "*.dylib" -o -name "*.a" -o -name "MoltenVK" \) -print
+
+      - name: Repackage the tvOS framework as libMoltenVK.dylib
+        run: |
+          set -e
+          # `make tvos` emits a dynamic FRAMEWORK, whose Mach-O is named plain
+          # "MoltenVK". The core dlopens a dylib, so it is republished under the
+          # name and install name the iOS build used.
+          FW=$(find mvk/Package -path "*dynamic*" -name "MoltenVK" -type f | head -1)
+          echo "framework binary: $FW"
+          [ -n "$FW" ] || { echo "FAIL: no dynamic MoltenVK produced"; exit 1; }
+          mkdir -p out
+          cp "$FW" out/libMoltenVK.dylib
+          install_name_tool -id @rpath/libMoltenVK.dylib out/libMoltenVK.dylib
+          ls -la out/
 
       - name: Verify Mach-O platform is tvOS
         run: |
           set -e
-          # The dynamic dylib lives at
-          # Package/Release/MoltenVK/dynamic/MoltenVK.xcframework/tvos-arm64*/libMoltenVK.dylib,
-          # which is seven levels down -- deeper than a shallow maxdepth reaches.
-          BIN=$(find mvk/Package -name "libMoltenVK.dylib" -path "*dynamic*" | head -1)
-          [ -n "$BIN" ] || BIN=$(find mvk/Package -name "libMoltenVK.dylib" | head -1)
-          echo "binary: $BIN"
-          [ -n "$BIN" ] || { echo "FAIL: no libMoltenVK.dylib produced"; exit 1; }
+          BIN=out/libMoltenVK.dylib
           file "$BIN"
-          PLAT=$(otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
-          echo "platform: $PLAT"
-          echo "$PLAT" | grep -qiE "tvos|platform 3" || { echo "FAIL: MoltenVK is not a tvOS binary"; exit 1; }
+          LC=$(otool -l "$BIN" | grep -A4 -E "LC_BUILD_VERSION|LC_VERSION_MIN_TVOS" || true)
+          echo "$LC"
+          echo "$LC" | grep -qiE "LC_VERSION_MIN_TVOS|platform 3|platform tvos"             || { echo "FAIL: MoltenVK is not a tvOS binary"; exit 1; }
           echo "OK: MoltenVK built for tvOS"
 
       - uses: actions/upload-artifact@v4
         with:
           name: MoltenVK-tvos
-          path: mvk/Package/Release/MoltenVK/dynamic/MoltenVK.xcframework
+          path: out/libMoltenVK.dylib
           if-no-files-found: error
