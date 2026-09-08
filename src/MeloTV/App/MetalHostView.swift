@@ -27,6 +27,10 @@ final class MetalHostUIView: UIView {
         guard !handedOver, window != nil, bounds.width > 0 else { return }
         handedOver = true
         RyujinxBridge.setNativeWindow(Unmanaged.passUnretained(layer).toOpaque())
+
+        // Only now is it safe to boot: the core copies this layer once, early, and
+        // does not retry if it is missing.
+        DispatchQueue.main.async { EmulatorRunner.shared.layerReady() }
     }
 }
 

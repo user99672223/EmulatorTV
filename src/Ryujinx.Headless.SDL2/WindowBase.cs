@@ -284,6 +284,23 @@ namespace Ryujinx.Headless.SDL2
 
         public void Render()
         {
+            // This runs on its own thread, so anything thrown here is unhandled and
+            // takes the process down rather than surfacing as a failed boot -- which is
+            // how a missing CAMetalLayer presented: the app simply died on Start.
+            try
+            {
+                RenderCore();
+            }
+            catch (Exception ex)
+            {
+                Logger.Notice.Print(LogClass.Application, $"Render thread failed: {ex}");
+
+                _isActive = false;
+            }
+        }
+
+        private void RenderCore()
+        {
             InitializeWindowRenderer();
 
             Device.Gpu.Renderer.Initialize(_glLogLevel);

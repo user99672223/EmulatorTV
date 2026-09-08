@@ -17,7 +17,9 @@ struct ContentView: View {
     ]
 
     var body: some View {
-        if runner.isRunning {
+        if runner.showsOutput {
+            // Mounted while preparing too, so the CAMetalLayer exists before the core
+            // looks for it.
             MetalHostView()
                 .ignoresSafeArea()
                 .background(Color.black)

@@ -1,4 +1,4 @@
-using Ryujinx.Common.Configuration;
+﻿using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Input.HLE;
 using Ryujinx.SDL2.Common;
@@ -70,6 +70,31 @@ namespace Ryujinx.Headless.SDL2.Vulkan
             if (_surfaceCreated)
             {
                 return (IntPtr)(ulong)_surface.Handle;
+            }
+
+            // The layer is copied into this instance once, in LoadApplication, which
+            // can run before the host app has produced its CAMetalLayer -- and
+            // SetNativeWindow returns early on a zero, so the copy is never retried.
+            // Re-read the live value instead of trusting that one-shot copy, and give
+            // the UI a moment to hand it over rather than throwing on a race. This
+            // exception is raised on the render thread, where it is unhandled and takes
+            // the whole process down.
+            if (nativeMetalLayer == IntPtr.Zero)
+            {
+                for (int attempt = 0; attempt < 100 && nativeMetalLayer == IntPtr.Zero; attempt++)
+                {
+                    nativeMetalLayer = Program.GetNativeMetalLayer();
+
+                    if (nativeMetalLayer == IntPtr.Zero)
+                    {
+                        System.Threading.Thread.Sleep(50);
+                    }
+                }
+
+                if (nativeMetalLayer != IntPtr.Zero)
+                {
+                    Logger.Info?.Print(LogClass.Application, "Picked up the CAMetalLayer after waiting for the host view.");
+                }
             }
 
             if (nativeMetalLayer == IntPtr.Zero)

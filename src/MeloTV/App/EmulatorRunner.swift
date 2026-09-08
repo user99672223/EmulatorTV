@@ -5,7 +5,16 @@ final class EmulatorRunner: ObservableObject {
     static let shared = EmulatorRunner()
 
     @Published private(set) var isRunning = false
+    /// True from the moment Start is pressed until the emulator thread is launched.
+    /// The Metal view is mounted during this window so the CAMetalLayer exists before
+    /// the core asks for it.
+    @Published private(set) var isPreparing = false
     @Published private(set) var lastMessage: String?
+
+    /// Set to true while either preparing or running, so the UI shows the Metal view.
+    var showsOutput: Bool { isPreparing || isRunning }
+
+    private var pendingArgs: [String]?
 
     private init() {}
 
@@ -13,8 +22,7 @@ final class EmulatorRunner: ObservableObject {
     /// so it gets its own thread with a large stack; the UI thread stays free to
     /// service the SDL main-thread dispatcher the core installs on Apple targets.
     func start(game: URL, applicationPoolMiB: Int, dramMiB: Int = 3072) {
-        guard !isRunning else { return }
-        isRunning = true
+        guard !isRunning, !isPreparing else { return }
         lastMessage = nil
 
         var args: [String] = [game.path]
@@ -61,11 +69,31 @@ final class EmulatorRunner: ObservableObject {
 
         EmulatorRunner.log("starting: " + args.joined(separator: " "))
 
+        // Do NOT start the emulator yet. The core copies the CAMetalLayer once, early
+        // in LoadApplication, and gives up if it is not there; mounting the Metal view
+        // only after the emulator starts loses that race and the render thread dies
+        // with "No CAMetalLayer set". Store the arguments and wait for the layer.
+        pendingArgs = args
+        isPreparing = true
+        EmulatorRunner.log("prepared, waiting for the Metal layer")
+    }
+
+    /// Called by the Metal view once it has handed its layer to the core.
+    func layerReady() {
+        guard isPreparing, let args = pendingArgs else { return }
+
+        pendingArgs = nil
+        isPreparing = false
+        isRunning = true
+
+        EmulatorRunner.log("layer handed over, starting emulator")
+
         let thread = Thread {
             let result = RyujinxBridge.mainRyu(argv: args)
             EmulatorRunner.log("main_ryujinx_sdl returned \(result)")
             DispatchQueue.main.async {
                 EmulatorRunner.shared.isRunning = false
+                EmulatorRunner.shared.isPreparing = false
                 EmulatorRunner.shared.lastMessage = "Emulator exited with code \(result)."
             }
         }
