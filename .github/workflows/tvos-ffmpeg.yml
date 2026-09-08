@@ -1,0 +1,68 @@
+name: tvOS FFmpeg (video decode)
+
+# Only avcodec and avutil are ever loaded: FFmpegApi whitelists exactly those two
+# (avcodec 58-59, avutil 56-57), which is FFmpeg 5.1. avformat, avfilter,
+# swresample and swscale are linked by the old iOS Xcode project but nothing in
+# the codebase resolves them, and libSPIRV and libteakra are not referenced at all.
+#
+# These are resolved lazily through a DllImportResolver, so the app launches and
+# renders without them; only in-game video decode needs them. Dispatch-only,
+# because macOS runner minutes on a private repo bill at 10x and this is not on
+# the path to a first boot.
+
+on:
+  workflow_dispatch:
+
+env:
+  FFMPEG_TAG: n5.1.6
+
+jobs:
+  ffmpeg:
+    name: avcodec + avutil -> tvOS
+    runs-on: macos-15
+    steps:
+      - name: Clone FFmpeg ${{ env.FFMPEG_TAG }}
+        run: git clone --depth 1 --branch "$FFMPEG_TAG" https://github.com/FFmpeg/FFmpeg.git ff
+
+      - name: Configure for tvOS arm64
+        run: |
+          set -e
+          cd ff
+          SDKPATH=$(xcrun --sdk appletvos --show-sdk-path)
+          ./configure \
+            --prefix="$PWD/out" \
+            --enable-cross-compile --target-os=darwin --arch=arm64 \
+            --cc="$(xcrun -f clang)" \
+            --sysroot="$SDKPATH" \
+            --extra-cflags="-arch arm64 -mappletvos-version-min=17.0 -isysroot $SDKPATH" \
+            --extra-ldflags="-arch arm64 -mappletvos-version-min=17.0 -isysroot $SDKPATH" \
+            --enable-shared --disable-static \
+            --disable-programs --disable-doc --disable-everything \
+            --enable-decoder=h264 --enable-decoder=vp8 --enable-decoder=vp9 \
+            --disable-avdevice --disable-avformat --disable-swresample --disable-swscale \
+            --disable-avfilter --disable-network --disable-audiotoolbox
+
+      - name: Build
+        run: cd ff && make -j"$(sysctl -n hw.ncpu)" && make install
+
+      - name: Verify both dylibs are tvOS
+        run: |
+          set -e
+          fail=0
+          for lib in avcodec avutil; do
+            BIN=$(find ff/out/lib -name "lib${lib}.*.dylib" -type f | head -1)
+            echo "--- $lib: $BIN"
+            [ -n "$BIN" ] || { echo "FAIL: lib$lib not produced"; fail=1; continue; }
+            file "$BIN"
+            PLAT=$(otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -i platform || true)
+            echo "platform: $PLAT"
+            echo "$PLAT" | grep -qiE "tvos|platform 3" || { echo "FAIL: lib$lib is not tvOS"; fail=1; }
+          done
+          [ "$fail" = "0" ] || exit 1
+          echo "OK: FFmpeg built for tvOS"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FFmpeg-tvos
+          path: ff/out/lib/*.dylib
+          if-no-files-found: error
