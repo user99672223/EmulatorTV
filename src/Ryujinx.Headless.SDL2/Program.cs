@@ -482,6 +482,9 @@ namespace Ryujinx.Headless.SDL2
         {
             try
             {
+                // Must run before anything can P/Invoke a bundled library.
+                AppleNativeLibraries.Register();
+
                 InitializeCore();
             }
             catch (Exception ex)
@@ -543,6 +546,8 @@ namespace Ryujinx.Headless.SDL2
 
         static void Main(string[] args)
         {
+            AppleNativeLibraries.Register();
+
             // Make process DPI aware for proper window sizing on high-res screens.
             ForceDpiAware.Windows();
 

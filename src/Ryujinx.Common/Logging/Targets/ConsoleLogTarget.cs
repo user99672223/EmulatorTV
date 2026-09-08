@@ -62,12 +62,16 @@ namespace Ryujinx.Common.Logging.Targets
             {
                 string line = _formatter.Format(args);
 
-                if (OperatingSystem.IsTvOS())
+                if (OperatingSystem.IsTvOS() && !_publicLogUnavailable)
                 {
+                    // Emitting to stdout as well would duplicate every line, and the
+                    // stdout copy is the one the unified log redacts to <private>.
                     LogPublic(line);
                 }
-
-                Console.WriteLine(line);
+                else
+                {
+                    Console.WriteLine(line);
+                }
             }
             else
             {
