@@ -240,3 +240,18 @@ playground.xcworkspace
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# ---- Switch content: keys, firmware, game images. Never commit. ----
+*.keys
+prod.keys
+title.keys
+console.keys
+*.nsp
+*.xci
+*.nca
+*.nsz
+*.xcz
+*.tik
+*.cert
+firmware/
+Firmware/

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <RuntimeIdentifiers>ios-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifiers>ios-arm64;tvos-arm64</RuntimeIdentifiers>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>1.0.0-dirty</Version>
     <DefineConstants Condition=" '$(ExtraDefineConstants)' != '' ">$(DefineConstants);$(ExtraDefineConstants)</DefineConstants>
@@ -54,10 +54,16 @@
     <ItemGroup>
           <!-- <LinkerArg Include="-Wl,-ld_classic" /> -->
       <LinkerArg Include="-flto -Ofast" />
+      <!-- iOS -->
       <LinkerArg Include="-isysroot %22$(XCodePath)Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator.sdk%22"
-                 Condition=" $(RuntimeIdentifier.Contains('simulator')) "/>
+                 Condition=" $(RuntimeIdentifier.StartsWith('iossimulator')) "/>
       <LinkerArg Include="-isysroot %22$(XCodePath)Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk%22"
-                 Condition=" !$(RuntimeIdentifier.Contains('simulator')) "/>
+                 Condition=" $(RuntimeIdentifier.StartsWith('ios-')) "/>
+      <!-- tvOS -->
+      <LinkerArg Include="-isysroot %22$(XCodePath)Platforms/AppleTVSimulator.platform/Developer/SDKs/AppleTVSimulator.sdk%22"
+                 Condition=" $(RuntimeIdentifier.StartsWith('tvossimulator')) "/>
+      <LinkerArg Include="-isysroot %22$(XCodePath)Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS.sdk%22"
+                 Condition=" $(RuntimeIdentifier.StartsWith('tvos-')) "/>
     </ItemGroup>
 
   </Target>

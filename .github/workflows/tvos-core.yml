@@ -1,0 +1,62 @@
+name: tvOS core (Ryujinx dylib)
+
+# Milestone 1, step 1: prove the Ryujinx C# core compiles to a native
+# tvOS arm64 dylib via NativeAOT. Nothing here touches the Swift app yet.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tvos]
+
+jobs:
+  build:
+    name: Ryujinx.Headless.SDL2 -> tvos-arm64
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode and SDKs
+        run: |
+          xcodebuild -version
+          echo "--- AppleTVOS SDK ---"
+          xcodebuild -showsdks | grep -i appletv || echo "NO tvOS SDK FOUND"
+          xcrun --sdk appletvos --show-sdk-path || true
+          xcrun --sdk appletvos --show-sdk-version || true
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore for tvos-arm64
+        run: dotnet restore src/Ryujinx.Headless.SDL2 -r tvos-arm64
+
+      - name: Publish NativeAOT dylib for tvos-arm64
+        run: |
+          dotnet publish src/Ryujinx.Headless.SDL2 \
+            -c Release \
+            -r tvos-arm64 \
+            --self-contained true \
+            -p:ExtraDefineConstants=DISABLE_UPDATER
+
+      - name: Verify Mach-O platform is tvOS
+        run: |
+          set -e
+          DYLIB=$(find src/Ryujinx.Headless.SDL2/bin/Release -name "Ryujinx.Headless.SDL2.dylib" | head -1)
+          echo "dylib: $DYLIB"
+          ls -la "$DYLIB"
+          echo "--- load commands ---"
+          otool -l "$DYLIB" | grep -A4 LC_BUILD_VERSION | head -20
+          # platform 3 == tvOS. Fail loudly if we somehow produced an iOS binary.
+          if otool -l "$DYLIB" | grep -A4 LC_BUILD_VERSION | grep -qi "platform.*tvos\|platform 3"; then
+            echo "OK: built for tvOS"
+          else
+            echo "WARNING: platform is not tvOS -- inspect the output above"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ryujinx-tvos-arm64-dylib
+          path: |
+            src/Ryujinx.Headless.SDL2/bin/Release/**/tvos-arm64/native/Ryujinx.Headless.SDL2.dylib
+          if-no-files-found: error
