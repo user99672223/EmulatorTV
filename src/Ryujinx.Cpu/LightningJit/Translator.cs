@@ -163,6 +163,9 @@ namespace Ryujinx.Cpu.LightningJit
             }
         }
 
+        private static int _loggedFirstDispatch;
+        private static int _loggedFirstReturn;
+
         public void Execute(State.ExecutionContext context, ulong address)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -171,7 +174,22 @@ namespace Ryujinx.Cpu.LightningJit
 
             // NativeInterface.SetPageTablePointer();
 
+            // The process dies with no catchable signal immediately after the shader
+            // cache loads, which is also when the first guest thread starts running.
+            // This marker distinguishes "died entering translated code" from "died
+            // somewhere else at the same moment" -- the two need completely different
+            // fixes, and inference alone cannot separate them.
+            if (Interlocked.Exchange(ref _loggedFirstDispatch, 1) == 0)
+            {
+                Logger.Notice.Print(LogClass.Cpu, $"Entering translated guest code for the first time at 0x{address:X}.");
+            }
+
             Stubs.DispatchLoop(context.NativeContextPtr, address);
+
+            if (Interlocked.Exchange(ref _loggedFirstReturn, 1) == 0)
+            {
+                Logger.Notice.Print(LogClass.Cpu, "Returned from the first guest dispatch loop.");
+            }
 
 
             NativeInterface.UnregisterThread();
