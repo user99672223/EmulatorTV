@@ -1,4 +1,4 @@
-using Ryujinx.Common.Configuration;
+﻿using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using System;
 using System.Collections.Concurrent;
@@ -65,6 +65,15 @@ namespace Ryujinx.SDL2.Common
                 // NOTE: As of SDL2 2.24.0, joycons are combined by default but the motion source only come from one of them.
                 // We disable this behavior for now.
                 SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_COMBINE_JOY_CONS, "0");
+
+                // The host app owns main() -- SwiftUI on tvOS, UIKit on iOS -- so SDL's
+                // own main was never linked, SDL_MainIsReady stays false, and SDL_Init
+                // refuses with "Application didn't initialize properly, did you include
+                // SDL_main.h...". This is exactly the call SDL_main would have made.
+                if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+                {
+                    SDL_SetMainReady();
+                }
 
                 if (SDL_Init(SdlInitFlags) != 0)
                 {

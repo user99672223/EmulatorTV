@@ -19,7 +19,11 @@ namespace Ryujinx.Common.SystemInterop
 
         public StdErrAdapter()
         {
-            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS()) // TODO: iOS?
+            // iOS and tvOS included: without this, anything written to stderr -- most
+            // importantly the runtime's unhandled-exception dump -- goes straight to
+            // the unified log, where it is redacted to <private>. Routing it through
+            // Logger sends it out via the public os_log path instead.
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
             {
                 RegisterPosix();
             }

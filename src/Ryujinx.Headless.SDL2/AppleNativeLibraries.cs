@@ -36,6 +36,10 @@ namespace Ryujinx.Headless.SDL2
             ["libvulkan"] = "libMoltenVK.dylib",
             ["libvulkan.dylib"] = "libMoltenVK.dylib",
             ["libvulkan.1.dylib"] = "libMoltenVK.dylib",
+            // Some assemblies import by bundle-relative path rather than by bare
+            // name; map those to the same absolute locations.
+            ["SDL2.framework/SDL2"] = "SDL2.framework/SDL2",
+            ["RyujinxHelper.framework/RyujinxHelper"] = "RyujinxHelper.framework/RyujinxHelper",
         };
 
         public static void Register()
@@ -68,6 +72,15 @@ namespace Ryujinx.Headless.SDL2
             TryRegister(typeof(Graphics.Vulkan.MoltenVK.MVKInitialization).Assembly, resolver, "Ryujinx.Graphics.Vulkan");
             TryRegister(typeof(Silk.NET.Vulkan.Vk).Assembly, resolver, "Silk.NET.Vulkan");
             TryRegister(typeof(AppleNativeLibraries).Assembly, resolver, "Ryujinx.Headless.SDL2");
+
+            // These import bundled libraries too, and a resolver only applies to the
+            // assembly it is registered on. Audio.Backends.SDL2 imports
+            // "SDL2.framework/SDL2"; Common, HLE and Input import RyujinxHelper.
+            TryRegister(typeof(Audio.Backends.SDL2.SDL2HardwareDeviceDriver).Assembly, resolver, "Ryujinx.Audio.Backends.SDL2");
+            TryRegister(typeof(Common.Logging.Logger).Assembly, resolver, "Ryujinx.Common");
+            TryRegister(typeof(HLE.Switch).Assembly, resolver, "Ryujinx.HLE");
+            TryRegister(typeof(Input.IGamepad).Assembly, resolver, "Ryujinx.Input");
+            TryRegister(typeof(Memory.MemoryBlock).Assembly, resolver, "Ryujinx.Memory");
         }
 
         private static void TryRegister(Assembly assembly, DllImportResolver resolver, string label)
