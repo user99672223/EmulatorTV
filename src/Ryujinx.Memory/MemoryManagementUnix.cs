@@ -59,7 +59,7 @@ namespace Ryujinx.Memory
                 throw new SystemException(Marshal.GetLastPInvokeErrorMessage());
             }
 
-            if (OperatingSystem.IsIOS() && forJit)
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && forJit)
             {
                 MachJitWorkaround.ReallocateAreaWithOwnership(ptr, (int)size);
             }
@@ -77,7 +77,7 @@ namespace Ryujinx.Memory
         {
             MmapProts prot = MmapProts.PROT_READ | MmapProts.PROT_WRITE;
 
-            if ((OperatingSystem.IsIOS() || OperatingSystem.IsMacOSVersionAtLeast(10, 14)) && forJit)
+            if (((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) || OperatingSystem.IsMacOSVersionAtLeast(10, 14)) && forJit)
             {
                 prot |= MmapProts.PROT_EXEC;
             }
@@ -147,7 +147,7 @@ namespace Ryujinx.Memory
         {
             int fd;
 
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 IntPtr baseAddress = MachJitWorkaround.AllocateSharedMemory(size, reserve);
 
@@ -202,7 +202,7 @@ namespace Ryujinx.Memory
 
         public static void DestroySharedMemory(IntPtr handle)
         {
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 if (_sharedMemorySizes.TryGetValue(handle, out ulong size))
                 {
@@ -218,7 +218,7 @@ namespace Ryujinx.Memory
 
         public static IntPtr MapSharedMemory(IntPtr handle, ulong size)
         {
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 // The base of the shared memory is already mapped - it's the handle.
                 // Views are remapped from it.
@@ -233,7 +233,7 @@ namespace Ryujinx.Memory
 
         public static void UnmapSharedMemory(IntPtr address, ulong size)
         {
-            if (!OperatingSystem.IsIOS())
+            if (!(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 munmap(address, size);
             }
@@ -241,7 +241,7 @@ namespace Ryujinx.Memory
 
         public static void MapView(IntPtr sharedMemory, ulong srcOffset, IntPtr location, ulong size)
         {
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 MachJitWorkaround.MapView(sharedMemory, srcOffset, location, size);
             }

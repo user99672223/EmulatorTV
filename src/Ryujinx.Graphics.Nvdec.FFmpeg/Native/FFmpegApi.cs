@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -30,7 +30,7 @@ namespace Ryujinx.Graphics.Nvdec.FFmpeg.Native
             {
                 return $"lib{libraryName}.{version}.dylib";
             }
-            else if (OperatingSystem.IsIOS()) 
+            else if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) 
             {
                 string libName = $"lib{libraryName}.{version}.dylib";
                 return libName;

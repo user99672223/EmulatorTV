@@ -1,4 +1,4 @@
-using Ryujinx.HLE.UI;
+﻿using Ryujinx.HLE.UI;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,7 +51,7 @@ namespace Ryujinx.Headless.SDL2
                     return;
                 }
 
-                if (OperatingSystem.IsIOS())
+                if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     ShowIosKeyboardPrompt();
                 }

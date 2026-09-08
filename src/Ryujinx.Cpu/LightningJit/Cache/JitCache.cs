@@ -1,4 +1,4 @@
-using ARMeilleure.Memory;
+﻿using ARMeilleure.Memory;
 using Ryujinx.Memory;
 using System;
 using System.Collections.Generic;
@@ -101,7 +101,7 @@ namespace Ryujinx.Cpu.LightningJit.Cache
 
         public static void Unmap(IntPtr pointer)
         {
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 return;
             }

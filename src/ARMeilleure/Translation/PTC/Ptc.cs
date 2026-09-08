@@ -1,4 +1,4 @@
-using ARMeilleure.CodeGen;
+﻿using ARMeilleure.CodeGen;
 using ARMeilleure.CodeGen.Linking;
 using ARMeilleure.CodeGen.Unwinding;
 using ARMeilleure.Common;
@@ -1011,7 +1011,7 @@ namespace ARMeilleure.Translation.PTC
             osPlatform |= (OperatingSystem.IsLinux()   ? 1u : 0u) << 1;
             osPlatform |= (OperatingSystem.IsMacOS()   ? 1u : 0u) << 2;
             osPlatform |= (OperatingSystem.IsWindows() ? 1u : 0u) << 3;
-            osPlatform |= (OperatingSystem.IsIOS()     ? 1u : 0u) << 4;
+            osPlatform |= ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())     ? 1u : 0u) << 4;
 #pragma warning restore IDE0055
 
             return osPlatform;

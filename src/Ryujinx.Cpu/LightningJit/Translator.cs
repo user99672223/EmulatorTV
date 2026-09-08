@@ -1,4 +1,4 @@
-using ARMeilleure.Common;
+﻿using ARMeilleure.Common;
 using ARMeilleure.Memory;
 using Ryujinx.Cpu.Jit;
 using Ryujinx.Cpu.LightningJit.Cache;
@@ -24,7 +24,7 @@ namespace Ryujinx.Cpu.LightningJit
     class Translator : IDisposable
     {
         // Should be enabled on platforms that enforce W^X.
-        private static bool IsNoWxPlatform => OperatingSystem.IsIOS();
+        private static bool IsNoWxPlatform => (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS());
 
 
         private static readonly AddressTable<ulong>.Level[] _levels64Bit =

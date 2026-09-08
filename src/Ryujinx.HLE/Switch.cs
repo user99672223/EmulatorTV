@@ -1,7 +1,8 @@
-using Ryujinx.Audio.Backends.CompatLayer;
+﻿using Ryujinx.Audio.Backends.CompatLayer;
 using Ryujinx.Audio.Backends.DelayLayer;
 using Ryujinx.Audio.Integration;
 using Ryujinx.Common.Configuration;
+using Ryujinx.Common.SystemInfo;
 using Ryujinx.Graphics.Gpu;
 using Ryujinx.HLE.FileSystem;
 using Ryujinx.HLE.HOS;
@@ -49,6 +50,13 @@ namespace Ryujinx.HLE
 #pragma warning disable IDE0055 // Disable formatting
             AudioDeviceDriver = AddAudioCompatLayers(Configuration.AudioDeviceDriver);
             Memory            = new MemoryBlock(Configuration.MemoryConfiguration.ToDramSize(), memoryAllocationFlags);
+
+            // Measurement point 2 of 3. The block above is a reservation of address
+            // space, not committed memory, so on a healthy host this should barely move
+            // the needle; if it does, the address space is being committed eagerly and
+            // that is the problem to fix before tuning pool sizes.
+            AppleMemoryProbe.Log("guest pool reserved");
+
             Gpu               = new GpuContext(Configuration.GpuRenderer);
             System            = new HOS.Horizon(this);
             Statistics        = new PerformanceStatistics();
@@ -71,7 +79,7 @@ namespace Ryujinx.HLE
 
         private IHardwareDeviceDriver AddAudioCompatLayers(IHardwareDeviceDriver driver)
         {
-            ulong sampleDelay = OperatingSystem.IsIOS() ? 1024ul : 0;
+            ulong sampleDelay = (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) ? 1024ul : 0;
             driver = new CompatLayerHardwareDeviceDriver(driver);
 
             if (sampleDelay > 0)

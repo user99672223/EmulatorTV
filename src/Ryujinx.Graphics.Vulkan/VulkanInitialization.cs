@@ -1,4 +1,4 @@
-using Ryujinx.Common.Configuration;
+﻿using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Graphics.GAL;
 using Silk.NET.Vulkan;
@@ -464,7 +464,7 @@ namespace Ryujinx.Graphics.Vulkan
                 pExtendedFeatures = &featuresRobustness2;
             }
 
-            bool isDynamicStateSupported = OperatingSystem.IsIOSVersionAtLeast(17) || !OperatingSystem.IsIOS();
+            bool isDynamicStateSupported = OperatingSystem.IsIOSVersionAtLeast(17) || OperatingSystem.IsTvOSVersionAtLeast(17) || !(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS());
 
             if (isDynamicStateSupported)
             {

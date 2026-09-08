@@ -1,4 +1,4 @@
-using Ryujinx.Common.Configuration;
+﻿using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Configuration.Hid;
 using Ryujinx.Common.Logging;
 using Ryujinx.Graphics.GAL;
@@ -492,7 +492,7 @@ namespace Ryujinx.Headless.SDL2
         {
             // SDL2 doesn't support input dialogs
             // Trying to use Objective-C on iDevices
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 AlertHelper.ShowAlertWithTextInput(args.HeaderText, args.SubtitleText, args.GuideText, (inputText) =>
                 {
@@ -505,7 +505,7 @@ namespace Ryujinx.Headless.SDL2
 
         public bool DisplayMessageDialog(string title, string message)
         {
-            if (OperatingSystem.IsIOS()) 
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) 
             {
                 // TODO: Rework this :3
                 Console.WriteLine($"Alert: {title}, message: {message}");

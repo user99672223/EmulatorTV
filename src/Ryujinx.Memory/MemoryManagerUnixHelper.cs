@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
@@ -115,7 +115,7 @@ namespace Ryujinx.Memory
                 {
                     result |= MAP_ANONYMOUS_LINUX_GENERIC;
                 }
-                else if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                else if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     result |= MAP_ANONYMOUS_DARWIN;
                 }
@@ -131,7 +131,7 @@ namespace Ryujinx.Memory
                 {
                     result |= MAP_NORESERVE_LINUX_GENERIC;
                 }
-                else if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                else if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     result |= MAP_NORESERVE_DARWIN;
                 }
@@ -147,7 +147,7 @@ namespace Ryujinx.Memory
                 {
                     result |= MAP_UNLOCKED_LINUX_GENERIC;
                 }
-                else if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                else if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     // FIXME: Doesn't exist on Darwin
                 }
@@ -157,7 +157,7 @@ namespace Ryujinx.Memory
                 }
             }
 
-            if (flags.HasFlag(MmapFlags.MAP_JIT_DARWIN) && (OperatingSystem.IsIOS() || OperatingSystem.IsMacOSVersionAtLeast(10, 14)))
+            if (flags.HasFlag(MmapFlags.MAP_JIT_DARWIN) && ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) || OperatingSystem.IsMacOSVersionAtLeast(10, 14)))
             {
                 result |= (int)MmapFlags.MAP_JIT_DARWIN;
             }

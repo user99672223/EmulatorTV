@@ -1,4 +1,4 @@
-using Ryujinx.Common;
+﻿using Ryujinx.Common;
 using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Configuration.Hid;
 using Ryujinx.Common.Configuration.Hid.Controller;
@@ -1585,7 +1585,7 @@ namespace Ryujinx.UI.Common.Configuration
         {
             // Any system running macOS or returning any amount of valid Vulkan devices should default to Vulkan.
             // Checks for if the Vulkan version and featureset is compatible should be performed within VulkanRenderer.
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || VulkanRenderer.GetPhysicalDevices().Length > 0)
+            if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) || VulkanRenderer.GetPhysicalDevices().Length > 0)
             {
                 return GraphicsBackend.Vulkan;
             }

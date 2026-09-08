@@ -1,4 +1,4 @@
-using CommandLine;
+﻿using CommandLine;
 using LibHac.Tools.FsSystem;
 using Ryujinx.Audio.Backends.SDL2;
 using Ryujinx.Audio.Backends.Apple;
@@ -9,6 +9,7 @@ using Ryujinx.Common.Configuration.Hid.Controller.Motion;
 using Ryujinx.Common.Configuration.Hid.Keyboard;
 using Ryujinx.Common.GraphicsDriver;
 using Ryujinx.Common.Logging;
+using Ryujinx.Common.SystemInfo;
 using Ryujinx.Common.Logging.Targets;
 using Ryujinx.Common.SystemInterop;
 using Ryujinx.Common.Utilities;
@@ -520,12 +521,12 @@ namespace Ryujinx.Headless.SDL2
 
             Silk.NET.Core.Loader.SearchPathContainer.Platform = Silk.NET.Core.Loader.UnderlyingPlatform.MacOS;
 
-            if (!OperatingSystem.IsIOS())
+            if (!(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 // Console.Title = $"Ryujinx Console {Version} (Headless SDL2)";
             }
 
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || OperatingSystem.IsLinux())
+            if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) || OperatingSystem.IsLinux())
             {
                 AutoResetEvent invoked = new(false);
 
@@ -1413,6 +1414,19 @@ namespace Ryujinx.Headless.SDL2
 
         static void Load(Options option)
         {
+            // Measurement point 1 of 3: taken before the emulator allocates anything,
+            // so it includes the host app's own footprint and nothing else. Everything
+            // later is measured as a drop from this baseline.
+            AppleMemoryProbe.Log("launch (before guest alloc)");
+
+            if (option.ApplicationPoolMiB > 0)
+            {
+                MemoryTuning.ApplicationPoolSizeBytes = (ulong)option.ApplicationPoolMiB * 1024 * 1024;
+
+                Logger.Notice.Print(LogClass.Application,
+                    $"Application memory pool overridden to {option.ApplicationPoolMiB} MiB.");
+            }
+
             _libHacHorizonManager = new LibHacHorizonManager();
             _libHacHorizonManager.InitializeFsServer(_virtualFileSystem);
             _libHacHorizonManager.InitializeArpServer();
@@ -1427,7 +1441,7 @@ namespace Ryujinx.Headless.SDL2
 
             GraphicsConfig.EnableShaderCache = true;
 
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+            if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 if (option.GraphicsBackend == GraphicsBackend.OpenGl)
                 {
@@ -1553,7 +1567,7 @@ namespace Ryujinx.Headless.SDL2
                 }
             }
 
-            if (OperatingSystem.IsIOS()) 
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) 
             {
                 Logger.Info?.Print(LogClass.Application, $"Current Device: {option.DisplayName} ({option.DeviceModel}) {Environment.OSVersion.Version}");
                 Logger.Info?.Print(LogClass.Application, $"Increased Memory Limit: {option.MemoryEnt}");
@@ -1652,7 +1666,7 @@ namespace Ryujinx.Headless.SDL2
 
         private static WindowBase CreateWindow(Options options)
         {
-            if (OperatingSystem.IsIOS()) {
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) {
                 return new MoltenVKWindow(_inputManager, options.LoggingGraphicsDebugLevel, options.AspectRatio, options.EnableMouse, options.HideCursorMode);
             }
             else 
@@ -1720,7 +1734,7 @@ namespace Ryujinx.Headless.SDL2
             {
                 AppleHV = true;
             }
-            else if (OperatingSystem.IsIOS()) 
+            else if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) 
             {
                 AppleHV = false;
             } else {
@@ -1771,7 +1785,15 @@ namespace Ryujinx.Headless.SDL2
 
             _window.Initialize(_emulationContext, _inputConfiguration, _enableKeyboard, _enableMouse);
 
+            // Measurement point 3 of 3. Sampled repeatedly rather than once, because
+            // memory climbs while textures and shaders stream in; a single reading
+            // taken at an arbitrary moment would not be a steady state.
+            AppleMemoryProbe.StartPeriodicLogging(TimeSpan.FromSeconds(10));
+
             _window.Execute();
+
+            AppleMemoryProbe.StopPeriodicLogging();
+            AppleMemoryProbe.Log("shutdown");
 
             _emulationContext.Dispose();
             _window.Dispose();
@@ -1811,6 +1833,11 @@ namespace Ryujinx.Headless.SDL2
 
 
             _emulationContext = InitializeEmulationContext(window, renderer, options);
+
+            // Emulator fully constructed, guest has not run yet. The drop from the
+            // launch baseline to here is the emulator's own overhead, and it is the
+            // number the application pool size has to be chosen against.
+            AppleMemoryProbe.Log("emulator ready (pre-guest)");
 
             SystemVersion firmwareVersion = _contentManager.GetCurrentFirmwareVersion();
 

@@ -1,4 +1,4 @@
-using Ryujinx.HLE.HOS.Kernel.Memory;
+﻿using Ryujinx.HLE.HOS.Kernel.Memory;
 using System;
 
 namespace Ryujinx.HLE.HOS.Kernel.Common
@@ -22,6 +22,12 @@ namespace Ryujinx.HLE.HOS.Kernel.Common
 
         public static ulong GetApplicationPoolSize(MemoryArrange arrange)
         {
+            // A host-side override wins over the arrangement. See MemoryTuning.
+            if (MemoryTuning.ApplicationPoolSizeBytes is ulong overridden)
+            {
+                return overridden;
+            }
+
             return arrange switch
             {
                 MemoryArrange.MemoryArrange4GiB or

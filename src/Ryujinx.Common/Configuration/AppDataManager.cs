@@ -1,4 +1,4 @@
-using Ryujinx.Common.Logging;
+﻿using Ryujinx.Common.Logging;
 using Ryujinx.Common.Utilities;
 using System;
 using System.IO;
@@ -54,7 +54,7 @@ namespace Ryujinx.Common.Configuration
             {
                 appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support");
             }
-            else if (OperatingSystem.IsIOS())
+            else if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             }
@@ -68,7 +68,7 @@ namespace Ryujinx.Common.Configuration
                 appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             }
             string userProfilePath;
-            if (OperatingSystem.IsIOS()) 
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) 
             {
                 userProfilePath = appDataPath;
             }
@@ -157,7 +157,7 @@ namespace Ryujinx.Common.Configuration
             }
             else
             {
-                if (OperatingSystem.IsIOS())
+                if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     logDir = Path.Combine(BaseDirPath, "Logs");
 

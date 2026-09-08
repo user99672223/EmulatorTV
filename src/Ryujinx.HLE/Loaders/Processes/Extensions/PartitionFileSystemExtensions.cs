@@ -1,4 +1,4 @@
-using LibHac.Common;
+﻿using LibHac.Common;
 using LibHac.Common.Keys;
 using LibHac.Fs;
 using LibHac.Fs.Fsa;
@@ -155,7 +155,7 @@ namespace Ryujinx.HLE.Loaders.Processes.Extensions
 
         private static string PlatformRelative(string path)
         {
-            if (OperatingSystem.IsIOS() && !File.Exists(path))
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && !File.Exists(path))
             {
                 path = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), path);
             }

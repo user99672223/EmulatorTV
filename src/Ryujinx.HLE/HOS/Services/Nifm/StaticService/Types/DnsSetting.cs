@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Net;
@@ -19,7 +19,7 @@ namespace Ryujinx.HLE.HOS.Services.Nifm.StaticService.Types
         
             IPAddress ip = IPAddress.Parse("1.1.1.1");
 
-            if (OperatingSystem.IsIOS()) {
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) {
                 PrimaryDns = new IpV4Address(ip);
                 SecondaryDns = new IpV4Address(ip);
             } else {

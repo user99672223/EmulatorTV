@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
@@ -44,7 +44,7 @@ namespace Ryujinx.Common.PreciseSleep
         /// <returns>Bias in nanoseconds</returns>
         public static long GetBias(long timeoutNs)
         {
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+            if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 long biasNs = Math.Min(timeoutNs, MacosBiasMaxNanoseconds);
                 return MacosBaseNanosleepBias + biasNs * MacosBiasPerMillisecond / 1_000_000;
@@ -72,7 +72,7 @@ namespace Ryujinx.Common.PreciseSleep
         /// <returns>Strict bias in nanoseconds</returns>
         public static long GetStrictBias(long timeoutNs)
         {
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+            if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 return GetBias(timeoutNs) + MacosStrictBiasOffset;
             }

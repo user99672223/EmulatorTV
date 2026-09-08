@@ -1,4 +1,4 @@
-using Ryujinx.Horizon.Common;
+﻿using Ryujinx.Horizon.Common;
 using Ryujinx.Memory;
 using Ryujinx.Memory.Range;
 using System;
@@ -126,7 +126,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
                 Context.MemoryManager.IncrementPagesReferenceCount(srcPa, pagesCount);
             }
 
-            if (shouldFillPages && (!OperatingSystem.IsIOS() || !flags.HasFlag(MemoryMapFlags.Private) || fillValue != 0))
+            if (shouldFillPages && (!(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) || !flags.HasFlag(MemoryMapFlags.Private) || fillValue != 0))
             {
                 _cpuMemory.Fill(dstVa, size, fillValue);
             }
@@ -156,7 +156,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Memory
 
                 _cpuMemory.Map(currentVa, addr, size, flags);
 
-                if (shouldFillPages && (!OperatingSystem.IsIOS() || !flags.HasFlag(MemoryMapFlags.Private) || fillValue != 0))
+                if (shouldFillPages && (!(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) || !flags.HasFlag(MemoryMapFlags.Private) || fillValue != 0))
                 {
                     _cpuMemory.Fill(currentVa, size, fillValue);
                 }

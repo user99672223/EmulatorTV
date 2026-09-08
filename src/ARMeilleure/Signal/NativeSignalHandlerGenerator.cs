@@ -1,4 +1,4 @@
-using ARMeilleure.IntermediateRepresentation;
+﻿using ARMeilleure.IntermediateRepresentation;
 using ARMeilleure.Translation;
 using System;
 using System.Runtime.InteropServices;
@@ -87,13 +87,13 @@ namespace ARMeilleure.Signal
 
         private static Operand GenerateUnixFaultAddress(EmitterContext context, Operand sigInfoPtr)
         {
-            ulong structAddressOffset = (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS()) ? 24ul : 16ul; // si_addr
+            ulong structAddressOffset = (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) ? 24ul : 16ul; // si_addr
             return context.Load(OperandType.I64, context.Add(sigInfoPtr, Const(structAddressOffset)));
         }
 
         private static Operand GenerateUnixWriteFlag(EmitterContext context, Operand ucontextPtr)
         {
-            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+            if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 const ulong McontextOffset = 48; // uc_mcontext
                 Operand ctxPtr = context.Load(OperandType.I64, context.Add(ucontextPtr, Const(McontextOffset)));
@@ -276,7 +276,7 @@ namespace ARMeilleure.Signal
                         pcCtxAddress = context.Add(ucontextPtr, Const(440UL));
                         baseRegsOffset = 184UL;
                     }
-                    else if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                    else if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                     {
                         ucontextPtr = context.Load(OperandType.I64, context.Add(ucontextPtr, Const(48UL)));
 
@@ -335,7 +335,7 @@ namespace ARMeilleure.Signal
 
         private static bool SupportsFaultAddressPatchingForHostOs()
         {
-            return OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsIOS();
+            return OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS());
         }
     }
 }

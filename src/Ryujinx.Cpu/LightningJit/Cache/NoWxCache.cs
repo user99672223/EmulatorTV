@@ -1,4 +1,4 @@
-using ARMeilleure.Memory;
+﻿using ARMeilleure.Memory;
 using Ryujinx.Common;
 using Ryujinx.Memory;
 using System;
@@ -124,7 +124,7 @@ namespace Ryujinx.Cpu.LightningJit.Cache
                 var (allocatorIndex, localOffset) = GetAllocatorForOffset(offset);
                 _regions[allocatorIndex].Block.MapAsRx((ulong)localOffset, (ulong)size);
 
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     JitSupportDarwin.SysIcacheInvalidate(_regions[allocatorIndex].Block.Pointer + localOffset, size);
                 }

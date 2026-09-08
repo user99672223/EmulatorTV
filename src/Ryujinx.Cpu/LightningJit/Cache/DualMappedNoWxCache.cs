@@ -1,4 +1,4 @@
-using ARMeilleure.Memory;
+﻿using ARMeilleure.Memory;
 using Ryujinx.Common;
 using Ryujinx.Memory;
 using System;
@@ -56,7 +56,7 @@ namespace Ryujinx.Cpu.LightningJit.Cache
 
             public void SysIcacheInvalidate(int offset, int size)
             {
-                if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                if (OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     JitSupportDarwin.SysIcacheInvalidate(_allocator.RxPtr + offset, size);
                 }

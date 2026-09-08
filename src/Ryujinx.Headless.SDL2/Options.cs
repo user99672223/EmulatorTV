@@ -1,4 +1,4 @@
-using CommandLine;
+﻿using CommandLine;
 using Ryujinx.Common.Configuration;
 using Ryujinx.HLE.HOS.SystemState;
 
@@ -293,6 +293,9 @@ namespace Ryujinx.Headless.SDL2
 
         [Option("expand-ram", Required = false, Default = false, HelpText = "Expands the RAM amount on the emulated system from 4GiB to 8GiB.")]
         public bool ExpandRAM { get; set; }
+
+        [Option("application-pool-mib", Required = false, Default = 0, HelpText = "Size of the guest application memory pool in MiB. 0 uses the value implied by the memory configuration (3285 MiB on a stock 4GiB system). Lower this on memory constrained hosts so the guest sizes its heaps to fit.")]
+        public int ApplicationPoolMiB { get; set; }
 
         [Option("ignore-missing-services", Required = false, Default = false, HelpText = "Enable ignoring missing services.")]
         public bool IgnoreMissingServices { get; set; }

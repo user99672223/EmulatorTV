@@ -1,4 +1,4 @@
-using ARMeilleure.CodeGen;
+﻿using ARMeilleure.CodeGen;
 using ARMeilleure.CodeGen.Unwinding;
 using ARMeilleure.Memory;
 using ARMeilleure.Native;
@@ -57,10 +57,10 @@ namespace ARMeilleure.Translation.Cache
                     _jitRegion26 = new DualMappedJitAllocator(CacheSizeIOS);
                 } else
                 {
-                    _jitRegion = new ReservedRegion(allocator, (ulong)(OperatingSystem.IsIOS() ? CacheSizeIOS : CacheSize));
+                    _jitRegion = new ReservedRegion(allocator, (ulong)((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) ? CacheSizeIOS : CacheSize));
                 }
 
-                if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() && !OperatingSystem.IsIOS())
+                if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() && !(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     _jitCacheInvalidator = new JitCacheInvalidation(allocator);
                 }
@@ -98,7 +98,7 @@ namespace ARMeilleure.Translation.Cache
 
                 IntPtr funcPtr = _jitRegion == null ? _jitRegion26.RwPtr + funcOffset : _jitRegion.Pointer + funcOffset;
 
-                if (OperatingSystem.IsIOS())
+                if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     
                     Marshal.Copy(code, 0, funcPtr, code.Length);
@@ -147,7 +147,7 @@ namespace ARMeilleure.Translation.Cache
 
         public static void Unmap(IntPtr pointer)
         {
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 return;
             }
@@ -202,7 +202,7 @@ namespace ARMeilleure.Translation.Cache
 
             int alignment = CodeAlignment;
 
-            if (OperatingSystem.IsIOS() && !deferProtect)
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && !deferProtect)
             {
                 alignment = 0x4000;
             }
@@ -228,7 +228,7 @@ namespace ARMeilleure.Translation.Cache
         {
             int alignment = CodeAlignment;
 
-            if (OperatingSystem.IsIOS() && !deferProtect)
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && !deferProtect)
             {
                 alignment = 0x4000;
             }

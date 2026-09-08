@@ -1,4 +1,4 @@
-using ARMeilleure.Signal;
+﻿using ARMeilleure.Signal;
 using Ryujinx.Common;
 using Ryujinx.Memory;
 using System;
@@ -88,7 +88,7 @@ namespace Ryujinx.Cpu.Signal
 
                 ref SignalHandlerConfig config = ref GetConfigRef();
 
-                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
+                if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS() || (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
                 {
                     _signalHandlerPtr = MapCode(NativeSignalHandlerGenerator.GenerateUnixSignalHandler(_handlerConfig, rangeStructSize));
 
@@ -129,7 +129,7 @@ namespace Ryujinx.Cpu.Signal
         /// <returns>The previous signal handler, or IntPtr.Zero on failure</returns>
         public static IntPtr InstallUnixSignalHandler(int signal, IntPtr handlerPtr)
         {
-            if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS() && !OperatingSystem.IsIOS())
+            if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS() && !(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 throw new PlatformNotSupportedException("InstallUnixSignalHandler is only supported on Unix-like systems.");
             }

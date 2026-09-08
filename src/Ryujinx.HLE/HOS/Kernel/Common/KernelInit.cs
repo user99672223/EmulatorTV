@@ -1,3 +1,4 @@
+﻿using Ryujinx.Common.Logging;
 using Ryujinx.HLE.HOS.Kernel.Memory;
 using Ryujinx.Horizon.Common;
 using System;
@@ -58,6 +59,37 @@ namespace Ryujinx.HLE.HOS.Kernel.Common
 
             ulong nvServicesPoolSize = KSystemControl.GetMinimumNonSecureSystemPoolSize();
 
+            // The pools are carved from the top of DRAM downwards and the service pool
+            // absorbs whatever is left, so an application pool that is too large makes
+            // that subtraction underflow into an enormous bogus service pool instead of
+            // failing. Since the size is now settable from the command line, bound it.
+            const ulong MiB = 1024 * 1024;
+            const ulong MinimumServicePoolSize = 64 * MiB;
+            const ulong MinimumApplicationPoolSize = 128 * MiB;
+
+            ulong reservedBelowApplication =
+                DramMemoryMap.SlabHeapEnd + appletPoolSize + nvServicesPoolSize + MinimumServicePoolSize;
+
+            ulong maxApplicationPoolSize = poolEnd > reservedBelowApplication
+                ? poolEnd - reservedBelowApplication
+                : 0;
+
+            if (applicationPoolSize > maxApplicationPoolSize)
+            {
+                Logger.Warning?.Print(LogClass.Kernel,
+                    $"Application pool of {applicationPoolSize / MiB} MiB does not fit; clamping to {maxApplicationPoolSize / MiB} MiB.");
+
+                applicationPoolSize = maxApplicationPoolSize;
+            }
+
+            if (applicationPoolSize < MinimumApplicationPoolSize)
+            {
+                Logger.Warning?.Print(LogClass.Kernel,
+                    $"Application pool of {applicationPoolSize / MiB} MiB is below the {MinimumApplicationPoolSize / MiB} MiB floor; raising it.");
+
+                applicationPoolSize = MinimumApplicationPoolSize;
+            }
+
             applicationPool = new MemoryRegion(poolEnd - applicationPoolSize, applicationPoolSize);
 
             ulong nvServicesPoolEnd = applicationPool.Address - appletPoolSize;
@@ -71,6 +103,10 @@ namespace Ryujinx.HLE.HOS.Kernel.Common
             ulong servicePoolSize = nvServicesPool.Address - DramMemoryMap.SlabHeapEnd;
 
             servicePool = new MemoryRegion(DramMemoryMap.SlabHeapEnd, servicePoolSize);
+
+            Logger.Notice.Print(LogClass.Kernel,
+                $"Guest memory pools: application {applicationPoolSize / MiB} MiB, applet {appletPoolSize / MiB} MiB, " +
+                $"service {servicePoolSize / MiB} MiB, nvservices {nvServicesPoolSize / MiB} MiB (DRAM {(poolEnd - DramMemoryMap.DramBase) / MiB} MiB)");
 
             return new[]
             {

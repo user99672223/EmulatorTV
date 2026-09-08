@@ -1,4 +1,4 @@
-using Ryujinx.Common.Logging.Formatters;
+﻿using Ryujinx.Common.Logging.Formatters;
 using System;
 
 namespace Ryujinx.Common.Logging.Targets
@@ -30,7 +30,7 @@ namespace Ryujinx.Common.Logging.Targets
 
         public void Log(object sender, LogEventArgs args)
         {
-            if (OperatingSystem.IsIOS())
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 Console.WriteLine(_formatter.Format(args));
             }
@@ -46,7 +46,7 @@ namespace Ryujinx.Common.Logging.Targets
         {
             GC.SuppressFinalize(this);
 
-            if (!OperatingSystem.IsIOS())
+            if (!(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
                 Console.ResetColor();
             }
