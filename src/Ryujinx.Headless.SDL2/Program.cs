@@ -1730,11 +1730,19 @@ namespace Ryujinx.Headless.SDL2
 
             bool AppleHV = false;
 
-            if ((!OperatingSystem.IsIOSVersionAtLeast(16, 4)) && options.UseHypervisor) 
+            if (OperatingSystem.IsTvOS())
+            {
+                // Hypervisor.framework does not exist on tvOS. Note that the iOS version
+                // check below cannot be relied on to exclude it: IsIOSVersionAtLeast()
+                // is false on tvOS because it is not iOS at all, so the negation reads
+                // as true and would switch the hypervisor on.
+                AppleHV = false;
+            }
+            else if ((!OperatingSystem.IsIOSVersionAtLeast(16, 4)) && options.UseHypervisor) 
             {
                 AppleHV = true;
             }
-            else if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())) 
+            else if (OperatingSystem.IsIOS()) 
             {
                 AppleHV = false;
             } else {

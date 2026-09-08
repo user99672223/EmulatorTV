@@ -10,6 +10,7 @@ namespace Ryujinx.Memory
     [SupportedOSPlatform("linux")]
     [SupportedOSPlatform("macos")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     static class MemoryManagementUnix
     {
         private static readonly ConcurrentDictionary<IntPtr, ulong> _allocations = new();

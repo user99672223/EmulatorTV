@@ -1,4 +1,4 @@
-using Ryujinx.Common.Configuration;
+﻿using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Cpu;
 using Ryujinx.Cpu.AppleHv;
@@ -50,7 +50,9 @@ namespace Ryujinx.HLE.HOS
 
             bool isArm64Host = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
 
-            if ((OperatingSystem.IsMacOS() || (!OperatingSystem.IsIOSVersionAtLeast(16, 4))) && isArm64Host && for64Bit && context.Device.Configuration.UseHypervisor)
+            // !IsIOSVersionAtLeast() is true on tvOS (it is not iOS), so tvOS has to be
+            // excluded explicitly or it takes the hypervisor path it cannot support.
+            if (!OperatingSystem.IsTvOS() && (OperatingSystem.IsMacOS() || (!OperatingSystem.IsIOSVersionAtLeast(16, 4))) && isArm64Host && for64Bit && context.Device.Configuration.UseHypervisor)
             {
                 var cpuEngine = new HvEngine(_tickSource);
                 var memoryManager = new HvMemoryManager(context.Memory, addressSpaceSize, invalidAccessHandler);

@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
 namespace Ryujinx.Memory
 {
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     static unsafe partial class MachJitWorkaround
     {
         [LibraryImport("libc")]

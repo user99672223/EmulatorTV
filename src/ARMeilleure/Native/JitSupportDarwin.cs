@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
@@ -6,6 +6,7 @@ namespace ARMeilleure.Native
 {
     [SupportedOSPlatform("macos")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     static partial class JitSupportDarwin
     {
         [LibraryImport("libarmeilleure-jitsupport", EntryPoint = "armeilleure_jit_memcpy")]
@@ -13,6 +14,7 @@ namespace ARMeilleure.Native
     }
 
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     internal static partial class JitSupportDarwinAot
     {
         [LibraryImport("pthread", EntryPoint = "pthread_jit_write_protect_np")]

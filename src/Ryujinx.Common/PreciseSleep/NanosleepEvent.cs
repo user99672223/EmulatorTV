@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.Versioning;
 using System.Threading;
 
@@ -11,6 +11,7 @@ namespace Ryujinx.Common.PreciseSleep
     [SupportedOSPlatform("linux")]
     [SupportedOSPlatform("android")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     internal class NanosleepEvent : IPreciseSleepEvent
     {
         private readonly AutoResetEvent _waitEvent = new(false);

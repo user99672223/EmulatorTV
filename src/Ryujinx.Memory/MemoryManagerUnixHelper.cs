@@ -7,6 +7,7 @@ namespace Ryujinx.Memory
     [SupportedOSPlatform("linux")]
     [SupportedOSPlatform("macos")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     public static partial class MemoryManagerUnixHelper
     {
         [Flags]

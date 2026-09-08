@@ -1,4 +1,4 @@
-using Ryujinx.Audio.Common;
+﻿using Ryujinx.Audio.Common;
 using Ryujinx.Audio.Integration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Memory;
@@ -15,6 +15,7 @@ namespace Ryujinx.Audio.Backends.Apple
 {
     [SupportedOSPlatform("macos")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     public class AppleHardwareDeviceDriver : IHardwareDeviceDriver
     {
         private readonly ManualResetEvent _updateRequiredEvent;

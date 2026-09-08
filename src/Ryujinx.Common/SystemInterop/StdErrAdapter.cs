@@ -1,4 +1,4 @@
-using Microsoft.Win32.SafeHandles;
+﻿using Microsoft.Win32.SafeHandles;
 using Ryujinx.Common.Logging;
 using System;
 using System.IO;
@@ -28,6 +28,7 @@ namespace Ryujinx.Common.SystemInterop
         [SupportedOSPlatform("linux")]
         [SupportedOSPlatform("macos")]
         [SupportedOSPlatform("ios")]
+        [SupportedOSPlatform("tvos")]
         private void RegisterPosix()
         {
             const int StdErrFileno = 2;
@@ -46,6 +47,7 @@ namespace Ryujinx.Common.SystemInterop
         [SupportedOSPlatform("linux")]
         [SupportedOSPlatform("macos")]
         [SupportedOSPlatform("ios")]
+        [SupportedOSPlatform("tvos")]
         private async Task EventWorkerAsync(CancellationToken cancellationToken)
         {
             using TextReader reader = new StreamReader(_pipeReader, leaveOpen: true);
@@ -95,6 +97,7 @@ namespace Ryujinx.Common.SystemInterop
         [SupportedOSPlatform("linux")]
         [SupportedOSPlatform("macos")]
         [SupportedOSPlatform("ios")]
+        [SupportedOSPlatform("tvos")]
         private static Stream CreateFileDescriptorStream(int fd)
         {
             return new FileStream(

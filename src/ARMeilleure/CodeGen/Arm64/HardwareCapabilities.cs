@@ -131,6 +131,7 @@ namespace ARMeilleure.CodeGen.Arm64
 
         [SupportedOSPlatform("macos")]
         [SupportedOSPlatform("ios")]
+        [SupportedOSPlatform("tvos")]
         private static bool CheckSysctlName(string name)
         {
             ulong size = sizeof(int);

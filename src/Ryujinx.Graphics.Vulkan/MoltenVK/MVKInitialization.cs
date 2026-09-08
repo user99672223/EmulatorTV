@@ -1,4 +1,4 @@
-using Silk.NET.Core.Loader;
+﻿using Silk.NET.Core.Loader;
 using Silk.NET.Vulkan;
 using System;
 using System.Runtime.InteropServices;
@@ -8,6 +8,7 @@ namespace Ryujinx.Graphics.Vulkan.MoltenVK
 {
     [SupportedOSPlatform("macos")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     public static partial class MVKInitialization
     {
         private const string VulkanLib = "libvulkan.dylib";

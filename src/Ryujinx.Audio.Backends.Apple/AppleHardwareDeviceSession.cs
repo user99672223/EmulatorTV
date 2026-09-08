@@ -1,4 +1,4 @@
-using Ryujinx.Audio.Backends.Common;
+﻿using Ryujinx.Audio.Backends.Common;
 using Ryujinx.Audio.Common;
 using Ryujinx.Memory;
 using System;
@@ -14,6 +14,7 @@ namespace Ryujinx.Audio.Backends.Apple
 {
     [SupportedOSPlatform("macos")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     class AppleHardwareDeviceSession : HardwareDeviceSessionOutputBase
     {
         private const int NumBuffers = 3;

@@ -11,6 +11,7 @@ namespace Ryujinx.Common.PreciseSleep
     [SupportedOSPlatform("linux")]
     [SupportedOSPlatform("android")]
     [SupportedOSPlatform("ios")]
+    [SupportedOSPlatform("tvos")]
     internal static partial class Nanosleep
     {
         private const long LinuxBaseNanosleepBias = 50000; // 0.05ms
