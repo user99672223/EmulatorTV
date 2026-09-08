@@ -1,0 +1,97 @@
+name: tvOS native deps
+
+# Milestone 1, step 2: rebuild the native libraries for tvOS. Everything the app
+# bundles today is a platform=iOS Mach-O, which tvOS's dyld refuses to load.
+#
+# SDL2 and MoltenVK come first because they gate anything visible on screen, and
+# both must stay DYNAMIC: the Ryujinx core resolves SDL2 through DllImport("SDL2")
+# and Vulkan through Silk.NET's loader, neither of which a static library answers.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tvos]
+    paths: ['.github/workflows/tvos-deps.yml']
+
+env:
+  SDL_TAG: release-2.30.12
+  MVK_TAG: v1.4.2
+
+jobs:
+  sdl2:
+    name: SDL2 -> tvOS framework
+    runs-on: macos-15
+    steps:
+      - name: Clone SDL2 ${{ env.SDL_TAG }}
+        run: git clone --depth 1 --branch "$SDL_TAG" https://github.com/libsdl-org/SDL.git sdl
+
+      - name: Build Framework-tvOS (device, arm64)
+        run: |
+          set -eo pipefail
+          cd sdl
+          xcodebuild \
+            -project Xcode/SDL/SDL.xcodeproj \
+            -target "Framework-tvOS" \
+            -configuration Release \
+            -sdk appletvos \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" \
+            SYMROOT="$PWD/out" \
+            build
+
+      - name: Verify Mach-O platform is tvOS
+        run: |
+          set -eo pipefail
+          BIN=$(find sdl/out -path "*SDL2.framework/SDL2" -type f | head -1)
+          echo "binary: $BIN"
+          file "$BIN"
+          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | head -12
+          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -qi "platform.*tvos\|platform 3" \
+            || { echo "FAIL: SDL2 is not a tvOS binary"; exit 1; }
+          echo "OK: SDL2 built for tvOS"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SDL2-tvos-arm64
+          path: sdl/out/Release-appletvos/SDL2.framework
+          if-no-files-found: error
+
+  moltenvk:
+    name: MoltenVK -> tvOS dylib
+    runs-on: macos-15
+    steps:
+      - name: Clone MoltenVK ${{ env.MVK_TAG }}
+        run: git clone --depth 1 --branch "$MVK_TAG" https://github.com/KhronosGroup/MoltenVK.git mvk
+
+      - name: Fetch dependencies (tvOS only)
+        run: |
+          cd mvk
+          ./fetchDependencies --tvos
+
+      - name: Build for tvOS
+        run: |
+          cd mvk
+          make tvos
+
+      - name: Show what was produced
+        run: find mvk/Package -maxdepth 6 \( -name "*.dylib" -o -name "*.xcframework" -o -name "*.a" \) | head -30
+
+      - name: Verify Mach-O platform is tvOS
+        run: |
+          set -eo pipefail
+          BIN=$(find mvk/Package -name "libMoltenVK.dylib" -path "*tvOS*" | head -1)
+          if [ -z "$BIN" ]; then BIN=$(find mvk/Package -name "libMoltenVK.dylib" | head -1); fi
+          echo "binary: $BIN"
+          file "$BIN"
+          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | head -12
+          otool -l "$BIN" | grep -A4 LC_BUILD_VERSION | grep -qi "platform.*tvos\|platform 3" \
+            || { echo "FAIL: MoltenVK is not a tvOS binary"; exit 1; }
+          echo "OK: MoltenVK built for tvOS"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MoltenVK-tvos
+          path: |
+            mvk/Package/Release/MoltenVK/dynamic/**/libMoltenVK.dylib
+            mvk/Package/Release/MoltenVK/MoltenVK.xcframework
+          if-no-files-found: error
