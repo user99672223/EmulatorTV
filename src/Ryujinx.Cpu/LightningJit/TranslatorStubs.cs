@@ -234,11 +234,41 @@ namespace Ryujinx.Cpu.LightningJit
 
                 asm.Br(page);
 
+                int fallbackIndex = writer.InstructionPointer;
+
                 foreach (int branchOffset in branchToFallbackOffsets)
                 {
                     uint branchInst = writer.ReadInstructionAt(branchOffset);
                     Debug.Assert(writer.InstructionPointer > branchOffset);
                     writer.WriteInstructionAt(branchOffset, branchInst | ((uint)(writer.InstructionPointer - branchOffset) << 5));
+                }
+
+                // The emulator burns a full core inside this stub without ever reaching
+                // managed code, so the emitted instructions are dumped verbatim. A
+                // conditional branch whose imm19 field is still zero is a branch to
+                // itself, which is an infinite spin and looks exactly like this; reading
+                // the words settles that instead of inferring it.
+                {
+                    System.Text.StringBuilder sb = new();
+
+                    sb.Append($"DispatchStub emit: base=0x{_functionTable.Base:X} mask=0x{_functionTable.Mask:X} ");
+                    sb.Append($"levels={_functionTable.Levels.Length} fallbackAt={fallbackIndex} ");
+                    sb.Append($"branchSites=[{string.Join(",", branchToFallbackOffsets)}] ");
+                    sb.Append($"getFunctionAddress=0x{_getFunctionAddress:X}");
+
+                    Ryujinx.Common.Logging.Logger.Notice.Print(
+                        Ryujinx.Common.Logging.LogClass.Cpu, sb.ToString());
+
+                    System.Collections.Generic.List<uint> words = writer.GetList();
+                    System.Text.StringBuilder hex = new();
+
+                    for (int i = 0; i < words.Count; i++)
+                    {
+                        hex.Append($"{i}:{words[i]:X8} ");
+                    }
+
+                    Ryujinx.Common.Logging.Logger.Notice.Print(
+                        Ryujinx.Common.Logging.LogClass.Cpu, "DispatchStub code: " + hex.ToString());
                 }
 
                 // Fallback.
@@ -258,7 +288,13 @@ namespace Ryujinx.Cpu.LightningJit
                 throw new PlatformNotSupportedException();
             }
 
-            return Map(writer.AsByteSpan());
+            IntPtr dispatchStubPtr = Map(writer.AsByteSpan());
+
+            Ryujinx.Common.Logging.Logger.Notice.Print(
+                Ryujinx.Common.Logging.LogClass.Cpu,
+                $"DispatchStub mapped at 0x{dispatchStubPtr:X}.");
+
+            return dispatchStubPtr;
         }
 
         /// <summary>
