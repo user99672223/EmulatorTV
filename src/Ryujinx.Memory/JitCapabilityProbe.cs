@@ -71,6 +71,17 @@ namespace Ryujinx.Memory
         [DllImport(Lib, EntryPoint = "pthread_jit_write_protect_np")]
         private static extern void PthreadJitWriteProtect(int enabled);
 
+        [DllImport(Lib, EntryPoint = "mach_task_self")]
+        private static extern uint MachTaskSelf();
+
+        [DllImport(Lib, EntryPoint = "vm_remap")]
+        private static extern int VmRemap(uint targetTask, ref ulong targetAddress, ulong size, ulong mask,
+            int anywhere, uint srcTask, ulong srcAddress, int copy,
+            ref uint curProtection, ref uint maxProtection, int inheritance);
+
+        [DllImport(Lib, EntryPoint = "vm_protect")]
+        private static extern int VmProtect(uint task, ulong address, ulong size, int setMaximum, int newProtection);
+
         private static string Prot(int p) => string.Concat(
             (p & PROT_READ) != 0 ? "r" : "-",
             (p & PROT_WRITE) != 0 ? "w" : "-",
@@ -179,6 +190,92 @@ namespace Ryujinx.Memory
             }
         }
 
+        /// <summary>
+        /// The dual mapping, tested end to end.
+        ///
+        /// This device permits execute only on pages that were created executable and
+        /// never writable: mmap with PROT_READ|PROT_EXEC yields cur=r-x, while mprotect
+        /// adding execute to a writable page silently fails AND permanently strips execute
+        /// from the maximum protection. So the code cannot be written through the mapping
+        /// it is executed from. Two mappings of the same physical pages solve that -- one
+        /// born r-x for execution, one aliased rw- for writing -- which is what
+        /// DualMappedJitAllocator already builds.
+        ///
+        /// Writes a RET through the writable alias and calls it through the executable one.
+        /// </summary>
+        private static void DualMapped(string name, nuint size)
+        {
+            IntPtr rx = Mmap(IntPtr.Zero, size, PROT_READ | PROT_EXEC, MAP_ANON | MAP_PRIVATE, -1, 0);
+
+            if (rx == new IntPtr(-1))
+            {
+                Logger.Notice.Print(LogClass.Cpu,
+                    $"[JITCAP] {name,-34} rx mmap FAILED errno={Marshal.GetLastPInvokeError()}");
+
+                return;
+            }
+
+            Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} rx at 0x{rx:X} -> {Actual(rx)}");
+
+            ulong rw = 0;
+            uint cur = 0, max = 0;
+
+            int remap = VmRemap(MachTaskSelf(), ref rw, size, 0, 1, MachTaskSelf(), (ulong)rx, 0,
+                ref cur, ref max, 2);
+
+            if (remap != 0)
+            {
+                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} vm_remap FAILED {remap}");
+                Munmap(rx, size);
+
+                return;
+            }
+
+            int prot = VmProtect(MachTaskSelf(), rw, size, 0, PROT_READ | PROT_WRITE);
+
+            Logger.Notice.Print(LogClass.Cpu,
+                $"[JITCAP] {name,-34} rw alias at 0x{rw:X} vm_protect={prot} -> {Actual((IntPtr)rw)}");
+
+            if (prot != 0)
+            {
+                Munmap(rx, size);
+
+                return;
+            }
+
+            try
+            {
+                Marshal.WriteInt32((IntPtr)rw, unchecked((int)0xD65F03C0));    // AArch64 RET
+
+                SysIcacheInvalidate(rx, size);
+
+                string view = Actual(rx);
+
+                if (!view.Contains("cur=r-x"))
+                {
+                    Logger.Notice.Print(LogClass.Cpu,
+                        $"[JITCAP] {name,-34} rx view is {view}; NOT calling it");
+
+                    return;
+                }
+
+                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} rx view {view}, calling it");
+
+                Marshal.GetDelegateForFunctionPointer<Action>(rx)();
+
+                Logger.Notice.Print(LogClass.Cpu,
+                    $"[JITCAP] {name,-34} EXECUTED SUCCESSFULLY -- dual mapping works, use this");
+            }
+            catch (Exception ex)
+            {
+                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} threw: {ex.GetType().Name}");
+            }
+            finally
+            {
+                Munmap(rx, size);
+            }
+        }
+
         private static int _ran;
 
         /// <summary>
@@ -196,8 +293,11 @@ namespace Ryujinx.Memory
             {
                 Logger.Notice.Print(LogClass.Cpu, "[JITCAP] probing what this device grants for executable memory");
 
-                // The decisive test first. The previous run died inside a later case
-                // before reaching this one, which is the strategy the JIT actually needs.
+                // The only remaining strategy, first: write through an aliased rw mapping
+                // and execute through one that was born r-x.
+                DualMapped("dual: 16K rx + rw alias", 16384);
+                DualMapped("dual: 256M rx + rw alias", (nuint)(256 * 1024 * 1024));
+
                 WriteThenExecute("exec: 16K rw->rx", 16384, 0);
                 WriteThenExecute("exec: 16K rw->rx +NORESERVE", 16384, MAP_NORESERVE);
 

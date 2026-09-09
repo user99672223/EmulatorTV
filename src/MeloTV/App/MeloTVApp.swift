@@ -53,7 +53,20 @@ struct MeloTVApp: App {
             // Leaving it off keeps the allocator on the mmap path.
             ("HAS_TXM", "0"),
 
-            // Off, deliberately, and this is a reversal.
+            // Back on, and this reverses the earlier reversal for a measured reason.
+            //
+            // This device permits execute only on pages created executable and never
+            // written to: mmap with PROT_READ|PROT_EXEC gives cur=r-x, while mprotect
+            // adding execute to a writable page returns success, silently leaves the page
+            // r--, and permanently strips execute from its maximum protection. NoWxCache
+            // depends on exactly that flip, so it cannot work here no matter how its
+            // memory is reserved -- which is what the r--/max=rw- pages were all along.
+            //
+            // The dual mapping writes through an rw alias and executes through a separate
+            // r-x mapping of the same physical pages, so nothing ever needs the forbidden
+            // transition.
+            //
+            // Superseded note from when this was set to 0:
             //
             // The dual-mapped path exists to obtain executable memory WITHOUT a debugger,
             // which was the situation when it was selected: CS_DEBUGGED was clear and the
@@ -67,7 +80,7 @@ struct MeloTVApp: App {
             // dual-mapping. That matters because the dual-mapped dispatch code decodes as
             // correct in every instruction yet never executes: the guest burns a full core
             // without retiring a single instruction or reaching managed code.
-            ("DUAL_MAPPED_JIT", "0"),
+            ("DUAL_MAPPED_JIT", "1"),
 
             // Skip the mach ownership remap for JIT memory.
             //
