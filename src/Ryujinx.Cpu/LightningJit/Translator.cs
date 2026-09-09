@@ -74,7 +74,7 @@ namespace Ryujinx.Cpu.LightningJit
                     if (DualMappedJitAllocator.hasTXM)
                     {
                         if (originalDualMappedCache == null) {
-                            originalDualMappedCache = new(new JitMemoryAllocator(), CreateStackWalker());
+                            originalDualMappedCache = new(new JitMemoryAllocator(forJit: true), CreateStackWalker());
                             Functions = new TranslatorCache<TranslatedFunction>();
                         }
                         _dualMappedCache = originalDualMappedCache;
@@ -90,7 +90,7 @@ namespace Ryujinx.Cpu.LightningJit
                             firstSet = true;
                         } else
                         {
-                            _dualMappedCache = new(new JitMemoryAllocator(), CreateStackWalker());
+                            _dualMappedCache = new(new JitMemoryAllocator(forJit: true), CreateStackWalker());
                         }
                         _dualMappedCache.SetTranslator(this);
                         Functions = new TranslatorCache<TranslatedFunction>();
@@ -103,7 +103,7 @@ namespace Ryujinx.Cpu.LightningJit
                     if (_dualMappedCache != null) {
                         _dualMappedCache = null;
                     }
-                    _noWxCache = new(new JitMemoryAllocator(), CreateStackWalker(), this);
+                    _noWxCache = new(new JitMemoryAllocator(forJit: true), CreateStackWalker(), this);
                     Functions = new TranslatorCache<TranslatedFunction>();
                     FunctionTable = new AddressTable<ulong>(for64Bits ? _levels64Bit : _levels32Bit);
                     Stubs = new TranslatorStubs(FunctionTable, _noWxCache);
@@ -135,7 +135,7 @@ namespace Ryujinx.Cpu.LightningJit
                     Logger.Info?.Print(LogClass.Cpu, "Dual Mapped JIT enabled.");
                     try {
                         if (originalDualMappedCache == null) {
-                            originalDualMappedCache = new(new JitMemoryAllocator(), CreateStackWalker());
+                            originalDualMappedCache = new(new JitMemoryAllocator(forJit: true), CreateStackWalker());
                             Functions = new TranslatorCache<TranslatedFunction>();
                         }
                     } catch {
