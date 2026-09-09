@@ -114,6 +114,34 @@ namespace Ryujinx.HLE.HOS.Kernel.Threading
 
         private readonly object _activityOperationLock = new();
 
+        // Translated guest code runs its frames on this stack, so a deep call chain
+        // in the guest is a deep host stack.
+        //
+        // Upstream's 4096 * 100 is 400 KiB, which is fine where the stack is rarely
+        // stressed. Measured here, Rocket League ran off the end of it after about
+        // 3300 translated functions: EXC_BAD_ACCESS, KERN_PROTECTION_FAILURE, on a
+        // prologue reserving 192 bytes at exactly 192 bytes below the frame pointer
+        // -- the guard page.
+        //
+        // DOTNET_DefaultStackSize does not apply; passing a size to the Thread
+        // constructor overrides it.
+        //
+        // Kept modest because address space is scarce on this host and every guest
+        // thread takes one of these. GUEST_STACK_KIB overrides.
+        private static readonly int GuestThreadStackSize = GuestThreadStackSizeFromEnv();
+
+        private static int GuestThreadStackSizeFromEnv()
+        {
+            string value = Environment.GetEnvironmentVariable("GUEST_STACK_KIB");
+
+            if (int.TryParse(value, out int kib) && kib > 0)
+            {
+                return kib * 1024;
+            }
+
+            return 4 * 1024 * 1024;
+        }
+
         public KThread(KernelContext context) : base(context)
         {
             WaitSyncObjects = new KSynchronizationObject[MaxWaitSyncObjects];
@@ -181,7 +209,7 @@ namespace Ryujinx.HLE.HOS.Kernel.Threading
                 is64Bits = true;
             }
 
-            HostThread = new Thread(ThreadStart, 4096 * 100);
+            HostThread = new Thread(ThreadStart, GuestThreadStackSize);
 
             Context = owner?.CreateExecutionContext() ?? new ProcessExecutionContext();
 
