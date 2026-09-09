@@ -47,11 +47,24 @@ struct MeloTVApp: App {
 
             ("DOTNET_DefaultStackSize", "200000"),
 
-            // The Apple TV has TXM active, but HAS_TXM=1 routes JIT allocation through
-            // BreakpointJIT.framework, which is an iOS-only binary that is not in this
-            // bundle and which needs an attached debugger to service its brk traps.
-            // Leaving it off keeps the allocator on the mmap path.
-            ("HAS_TXM", "0"),
+            // On, and this reverses the first decision made in this port.
+            //
+            // It was set to 0 because BreakpointJIT.framework is an iOS-only binary that
+            // was not in this bundle. Both halves of that reasoning have now changed: the
+            // framework is rebuilt for tvOS from the original's own symbol table and is
+            // embedded here, and the mmap path it was avoiding has been measured to be
+            // impossible on this device -- every route to executable memory the app can
+            // take alone is refused, including a page created PROT_READ|PROT_EXEC and
+            // never written through.
+            //
+            // What does work is asking the debugger: a region it allocates rx executes,
+            // confirmed by a BRK returning SIGTRAP/EXC_BREAKPOINT against an rw control
+            // that returned EXC_BAD_ACCESS. HAS_TXM=1 routes allocation through the trap
+            // stubs that ask it.
+            //
+            // This makes the attached script load-bearing for the whole session, not just
+            // at startup: it has to service every JIT allocation.
+            ("HAS_TXM", "1"),
 
             // Back on, and this reverses the earlier reversal for a measured reason.
             //

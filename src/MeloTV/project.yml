@@ -35,6 +35,25 @@ targets:
         DYLIB_INSTALL_NAME_BASE: "@rpath"
         SKIP_INSTALL: NO
 
+  # Replaces the prebuilt, iOS-only BreakpointJIT.framework. The allocator reaches
+  # these three symbols through DllImport("BreakpointJIT.framework/BreakpointJIT"),
+  # so the framework name and the C symbol names both have to match exactly.
+  BreakpointJIT:
+    type: framework
+    platform: tvOS
+    sources: [BreakpointJIT]
+    info:
+      path: BreakpointJIT/Info.plist
+      properties:
+        CFBundleName: BreakpointJIT
+    settings:
+      base:
+        PRODUCT_NAME: BreakpointJIT
+        PRODUCT_BUNDLE_IDENTIFIER: com.melotv.BreakpointJIT
+        DEFINES_MODULE: YES
+        DYLIB_INSTALL_NAME_BASE: "@rpath"
+        SKIP_INSTALL: NO
+
   MeloTV:
     type: application
     platform: tvOS
@@ -68,6 +87,13 @@ targets:
       - target: RyujinxHelper
         embed: true
         codeSign: false
+      # Not linked, only embedded: nothing in Swift calls it. The allocator reaches
+      # it at runtime through DllImport, so it just has to be present in the bundle
+      # under the name the DllImport spells.
+      - target: BreakpointJIT
+        embed: true
+        codeSign: false
+        link: false
       # Dropped in by CI from the tvos-core and tvos-deps workflow artifacts.
       #
       # The core dylib IS linked: the Swift side binds its exports by
