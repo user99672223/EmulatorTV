@@ -88,10 +88,20 @@ namespace Ryujinx.Cpu.LightningJit
             _functionTable = functionTable;
             _noWxCache = noWxCache;
             _getFunctionAddressRef = NativeInterface.GetFunctionAddress;
-            _getFunctionAddress = Marshal.GetFunctionPointerForDelegate(_getFunctionAddressRef);
+            _getFunctionAddress = GetFunctionAddressPointer();
             _slowDispatchStub = new(GenerateSlowDispatchStub, isThreadSafe: true);
             _dispatchStub = new(GenerateDispatchStub, isThreadSafe: true);
             _dispatchLoop = new(GenerateDispatchLoop, isThreadSafe: true);
+        }
+
+        /// <summary>
+        /// Address of the native entry point the generated stubs call to translate a
+        /// guest function. See NativeInterface.GetFunctionAddressNative for why this is
+        /// not a delegate thunk.
+        /// </summary>
+        private static unsafe IntPtr GetFunctionAddressPointer()
+        {
+            return (IntPtr)(delegate* unmanaged<IntPtr, ulong, ulong>)&NativeInterface.GetFunctionAddressNative;
         }
 
         /// <summary>
@@ -108,7 +118,7 @@ namespace Ryujinx.Cpu.LightningJit
             _functionTable = functionTable;
             _dualMappedCache = dualMappedCache;
             _getFunctionAddressRef = NativeInterface.GetFunctionAddress;
-            _getFunctionAddress = Marshal.GetFunctionPointerForDelegate(_getFunctionAddressRef);
+            _getFunctionAddress = GetFunctionAddressPointer();
             _slowDispatchStub = new(GenerateSlowDispatchStub, isThreadSafe: true);
             _dispatchStub = new(GenerateDispatchStub, isThreadSafe: true);
             _dispatchLoop = new(GenerateDispatchLoop, isThreadSafe: true);
@@ -125,7 +135,7 @@ namespace Ryujinx.Cpu.LightningJit
 
             _functionTable = functionTable;
             _getFunctionAddressRef = NativeInterface.GetFunctionAddress;
-            _getFunctionAddress = Marshal.GetFunctionPointerForDelegate(_getFunctionAddressRef);
+            _getFunctionAddress = GetFunctionAddressPointer();
             _slowDispatchStub = new(GenerateSlowDispatchStub, isThreadSafe: true);
             _dispatchStub = new(GenerateDispatchStub, isThreadSafe: true);
             _dispatchLoop = new(GenerateDispatchLoop, isThreadSafe: true);
@@ -243,6 +253,17 @@ namespace Ryujinx.Cpu.LightningJit
                     writer.WriteInstructionAt(branchOffset, branchInst | ((uint)(writer.InstructionPointer - branchOffset) << 5));
                 }
 
+
+                // Fallback.
+                asm.Mov(Register(0), Register(29));
+                asm.Mov(Register(1), guestAddress);
+                asm.Mov(Register(16), (ulong)_getFunctionAddress);
+                asm.Blr(Register(16));
+                asm.Mov(Register(16), Register(0));
+                asm.Mov(Register(0), Register(19));
+
+                rsr.WriteEpilogue(ref asm);
+
                 // The emulator burns a full core inside this stub without ever reaching
                 // managed code, so the emitted instructions are dumped verbatim. A
                 // conditional branch whose imm19 field is still zero is a branch to
@@ -270,16 +291,6 @@ namespace Ryujinx.Cpu.LightningJit
                     Ryujinx.Common.Logging.Logger.Notice.Print(
                         Ryujinx.Common.Logging.LogClass.Cpu, "DispatchStub code: " + hex.ToString());
                 }
-
-                // Fallback.
-                asm.Mov(Register(0), Register(29));
-                asm.Mov(Register(1), guestAddress);
-                asm.Mov(Register(16), (ulong)_getFunctionAddress);
-                asm.Blr(Register(16));
-                asm.Mov(Register(16), Register(0));
-                asm.Mov(Register(0), Register(19));
-
-                rsr.WriteEpilogue(ref asm);
 
                 asm.Br(Register(16));
             }

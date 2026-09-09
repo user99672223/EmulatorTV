@@ -64,6 +64,23 @@ namespace Ryujinx.Cpu.LightningJit
 
         private static int _loggedFirstFunctionAddress;
 
+        /// <summary>
+        /// Native entry point for the generated dispatch stubs.
+        ///
+        /// The stubs previously reached managed code through a delegate wrapped by
+        /// Marshal.GetFunctionPointerForDelegate. That produces a reverse-P/Invoke thunk,
+        /// which NativeAOT has to synthesise, and on this build the guest never arrives:
+        /// the fallback path branches to that pointer and the process spins at 100% of a
+        /// core without a single managed frame running. UnmanagedCallersOnly is compiled
+        /// into an ordinary exported function instead, so the address in the emitted code
+        /// is the function itself.
+        /// </summary>
+        [System.Runtime.InteropServices.UnmanagedCallersOnly]
+        public static ulong GetFunctionAddressNative(IntPtr framePointer, ulong address)
+        {
+            return GetFunctionAddress(framePointer, address);
+        }
+
         public static ulong GetFunctionAddress(IntPtr framePointer, ulong address)
         {
             // The generated dispatch stub reaches managed code only through this
