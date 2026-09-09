@@ -55,6 +55,21 @@ struct MeloTVApp: App {
 
             ("DOTNET_DefaultStackSize", "200000"),
 
+            // Stop the GC reserving a quarter-terabyte of address space.
+            //
+            // Measured at launch, before the emulator allocates anything at all:
+            // 442 GiB of virtual address space across 186 regions, against 92 MiB
+            // actually resident. The GC's region heap reserves a very large range
+            // up front on 64-bit, which costs nothing on a desktop and is nearly
+            // everything here -- allocations start failing at about 460 GiB, so
+            // that baseline leaves the emulator only a few GiB to work in, and
+            // guest memory runs out of address space long before it runs out of
+            // memory.
+            //
+            // 4 GiB is far more than this process needs; managed heap has stayed
+            // around 50 MiB and peaked near 330 MiB across every run so far.
+            ("DOTNET_GCRegionRange", "0x100000000"),
+
             // On, and this reverses the first decision made in this port.
             //
             // It was set to 0 because BreakpointJIT.framework is an iOS-only binary that
