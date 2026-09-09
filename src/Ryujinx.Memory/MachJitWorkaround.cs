@@ -71,6 +71,10 @@ namespace Ryujinx.Memory
         {
             if (error != 0)
             {
+                Ryujinx.Common.Logging.Logger.Notice.Print(
+                    Ryujinx.Common.Logging.LogClass.Cpu,
+                    $"[JITMEM] mach call '{operation}' failed with {error}.");
+
                 throw new InvalidOperationException($"Mach operation '{operation}' failed with error: {error}");
             }
         }

@@ -62,7 +62,36 @@ namespace Ryujinx.Memory
 
             if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && forJit)
             {
-                MachJitWorkaround.ReallocateAreaWithOwnership(ptr, (int)size);
+                // This is the only thing that makes a region executable on this platform.
+                // The JIT pages come back r--/max=rw-, so either this does not run or it
+                // fails; an exception here would otherwise unwind into the translator
+                // constructor and be attributed to something else entirely.
+                Ryujinx.Common.Logging.Logger.Notice.Print(
+                    Ryujinx.Common.Logging.LogClass.Cpu,
+                    $"[JITMEM] applying ownership workaround at 0x{ptr:X} size 0x{size:X} prot={prot}.");
+
+                try
+                {
+                    MachJitWorkaround.ReallocateAreaWithOwnership(ptr, (int)size);
+
+                    Ryujinx.Common.Logging.Logger.Notice.Print(
+                        Ryujinx.Common.Logging.LogClass.Cpu,
+                        $"[JITMEM] ownership workaround succeeded at 0x{ptr:X}.");
+                }
+                catch (Exception ex)
+                {
+                    Ryujinx.Common.Logging.Logger.Notice.Print(
+                        Ryujinx.Common.Logging.LogClass.Cpu,
+                        $"[JITMEM] ownership workaround FAILED at 0x{ptr:X}: {ex.Message}");
+
+                    throw;
+                }
+            }
+            else if (forJit)
+            {
+                Ryujinx.Common.Logging.Logger.Notice.Print(
+                    Ryujinx.Common.Logging.LogClass.Cpu,
+                    $"[JITMEM] forJit requested at 0x{ptr:X} but platform branch not taken.");
             }
 
             if (!_allocations.TryAdd(ptr, size))
