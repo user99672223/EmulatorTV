@@ -131,8 +131,19 @@ struct MeloTVApp: App {
             //
             // The cost of small caches is eviction churn in a long session, not
             // correctness. Raise them once an allocation of this shape is known to work.
-            ("JIT_SHARED_CACHE_MIB", "4"),
-            ("JIT_LOCAL_CACHE_MIB", "1"),
+            // One translated block per page, and pages here are 16 KiB -- the
+            // published addresses came back 0x4000 apart. So these are counts of
+            // blocks, not a byte budget: 4 MiB held 256 of them, which the game
+            // exhausted in under a minute and then spent its time evicting and
+            // retranslating the same code.
+            //
+            // Each block costs a debugger round trip to publish, so a cache that
+            // thrashes does not merely run slowly, it never converges. 64 MiB is
+            // 4096 blocks. The earlier caution was about whether a large _M would
+            // be granted at all; 4 MiB is granted, and the allocator reports a
+            // refusal clearly if this proves too large.
+            ("JIT_SHARED_CACHE_MIB", "64"),
+            ("JIT_LOCAL_CACHE_MIB", "8"),
         ]
 
         for (key, value) in vars {
