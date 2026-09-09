@@ -43,7 +43,20 @@ namespace Ryujinx.Memory
                 flags |= MmapFlags.MAP_NORESERVE;
             }
 
-            if (OperatingSystem.IsMacOS() && OperatingSystem.IsMacOSVersionAtLeast(10, 14) && forJit)
+            // MAP_JIT is the mechanism that gets executable memory on Apple platforms, and
+            // it was never being requested here: this gate said macOS only, while
+            // MemoryManagerUnixHelper.ToMmapFlags already passes the flag through for iOS
+            // and tvOS explicitly. The plumbing was written for these platforms and only
+            // the caller excluded them -- the same macOS-only-gate mistake that appears
+            // throughout this tree.
+            //
+            // It matters because plain anonymous mmap here yields max=rw-, measured: no
+            // execute bit in the MAXIMUM protection, so no later mprotect or vm_protect can
+            // introduce one. MAP_JIT is what makes the kernel grant it, and the entitlement
+            // it would normally require is waived while CS_DEBUGGED is set, which it is by
+            // the time a game starts.
+            if (forJit && (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() ||
+                (OperatingSystem.IsMacOS() && OperatingSystem.IsMacOSVersionAtLeast(10, 14))))
             {
                 flags |= MmapFlags.MAP_JIT_DARWIN;
 
@@ -76,6 +89,13 @@ namespace Ryujinx.Memory
             // process footprint again. At ~320 MiB against a 2 GiB ceiling that is affordable.
             bool skipOwnershipRemap =
                 Environment.GetEnvironmentVariable("JIT_OWNERSHIP_REMAP") == "0";
+
+            if (forJit && (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
+            {
+                Ryujinx.Common.Logging.Logger.Notice.Print(
+                    Ryujinx.Common.Logging.LogClass.Cpu,
+                    $"[JITMEM] mapped 0x{ptr:X} size 0x{size:X} prot={prot} flags={flags}.");
+            }
 
             if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && forJit && skipOwnershipRemap)
             {
