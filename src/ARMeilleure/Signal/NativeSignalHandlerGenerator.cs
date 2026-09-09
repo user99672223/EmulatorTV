@@ -8,7 +8,16 @@ namespace ARMeilleure.Signal
 {
     public static class NativeSignalHandlerGenerator
     {
-        public const int MaxTrackedRanges = 8;
+        // One slot per live guest memory manager, and a Switch title brings up
+        // dozens of processes: Rocket League plus around forty-five Horizon
+        // service processes exhausted eight of them after ~2850 translated
+        // functions, with "Number of allowed tracked regions exceeded".
+        //
+        // Slots are released on dispose, so this is genuine concurrent demand
+        // rather than a leak. 64 covers the process count seen with room to
+        // spare; the cost is a larger scan in the fault path, which is cheap
+        // next to the fault itself.
+        public const int MaxTrackedRanges = 64;
 
         private const int StructAddressOffset = 0;
         private const int StructWriteOffset = 4;
