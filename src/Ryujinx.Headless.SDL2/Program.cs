@@ -109,6 +109,12 @@ namespace Ryujinx.Headless.SDL2
 
                 Logger.Notice.Print(LogClass.Application, "Launch arguments: " + string.Join(' ', args));
 
+                // Before anything allocates, establish what this device actually grants.
+                // Every conclusion about executable memory so far has come from watching
+                // the emulator fail; this asks the kernel directly, once, at the moment
+                // that matters -- after the debugger attach has set CS_DEBUGGED.
+                Ryujinx.Memory.JitCapabilityProbe.Run();
+
                 Main(args);
             }
             catch (Exception e)

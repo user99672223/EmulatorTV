@@ -55,8 +55,11 @@ namespace Ryujinx.Memory
             // introduce one. MAP_JIT is what makes the kernel grant it, and the entitlement
             // it would normally require is waived while CS_DEBUGGED is set, which it is by
             // the time a game starts.
-            if (forJit && (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() ||
-                (OperatingSystem.IsMacOS() && OperatingSystem.IsMacOSVersionAtLeast(10, 14))))
+            // MAP_JIT is NOT requested on iOS/tvOS: mmap refuses it with EPERM here even
+            // with CS_DEBUGGED set, which aborts the boot before anything else runs. Kept
+            // to macOS, where it is what the flag was written for. JitCapabilityProbe
+            // measures this directly rather than leaving it as a claim.
+            if (OperatingSystem.IsMacOS() && OperatingSystem.IsMacOSVersionAtLeast(10, 14) && forJit)
             {
                 flags |= MmapFlags.MAP_JIT_DARWIN;
 
