@@ -229,8 +229,15 @@ namespace Ryujinx.Cpu.LightningJit
         }
 
 
+        private static int _loggedFirstTranslateRequest;
+
         internal IntPtr GetOrTranslatePointer(IntPtr framePointer, ulong address, ExecutionMode mode)
         {
+            if (Interlocked.Exchange(ref _loggedFirstTranslateRequest, 1) == 0)
+            {
+                Logger.Notice.Print(LogClass.Cpu, $"First translation request for 0x{address:X}.");
+            }
+
             int guestCodeLength = 0;
             try
             {

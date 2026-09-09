@@ -25,6 +25,39 @@ namespace Ryujinx.Common.SystemInfo
         /// (and on platforms where it does not exist), so 0 means "no answer",
         /// not "no memory".
         /// </summary>
+        // CLOCK_PROCESS_CPUTIME_ID on Darwin.
+        private const int ClockProcessCpuTimeId = 12;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct TimeSpec
+        {
+            public long Seconds;
+            public long Nanoseconds;
+        }
+
+        [DllImport(SystemLib, EntryPoint = "clock_gettime", SetLastError = true)]
+        private static extern int ClockGetTime(int clockId, out TimeSpec ts);
+
+        private static double _lastCpuSeconds = -1;
+
+        /// <summary>Process CPU seconds consumed, or -1 when unavailable.</summary>
+        private static double CpuSeconds()
+        {
+            try
+            {
+                if (ClockGetTime(ClockProcessCpuTimeId, out TimeSpec ts) != 0)
+                {
+                    return -1;
+                }
+
+                return ts.Seconds + (ts.Nanoseconds / 1_000_000_000.0);
+            }
+            catch
+            {
+                return -1;
+            }
+        }
+
         [DllImport(SystemLib, EntryPoint = "os_proc_available_memory")]
         private static extern nuint OsProcAvailableMemory();
 
@@ -228,8 +261,30 @@ namespace Ryujinx.Common.SystemInfo
 
                     // Deltas, so a static line means genuinely nothing happened in
                     // the interval rather than nothing having happened since boot.
+                    double cpuNow = CpuSeconds();
+                    string cpuText;
+
+                    if (cpuNow < 0)
+                    {
+                        cpuText = "cpu unavailable";
+                    }
+                    else if (_lastCpuSeconds < 0)
+                    {
+                        cpuText = $"cpu {cpuNow:0.00}s total";
+                    }
+                    else
+                    {
+                        double used = cpuNow - _lastCpuSeconds;
+                        double wall = interval.TotalSeconds;
+
+                        // Around 100% of one core means a spin; near 0% means blocked.
+                        cpuText = $"cpu {used:0.00}s of {wall:0}s wall ({(used / wall) * 100.0:0}% of one core)";
+                    }
+
+                    _lastCpuSeconds = cpuNow;
+
                     Logger.Notice.Print(LogClass.Application,
-                        $"[RUN] t+{seconds}s  {Diagnostics.RunCounters.SampleDelta()}");
+                        $"[RUN] t+{seconds}s  {Diagnostics.RunCounters.SampleDelta()}  {cpuText}");
 
                     // Only while nothing is reaching the screen. During normal play this
                     // stays silent instead of printing a wall of threads every interval.
