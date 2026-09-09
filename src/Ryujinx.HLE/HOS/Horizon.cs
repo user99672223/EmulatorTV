@@ -125,7 +125,7 @@ namespace Ryujinx.HLE.HOS
             // The periodic diagnostic timer lives in Ryujinx.Common, which cannot see the
             // guest kernel -- these types are internal to this assembly. Hand it a closure
             // that can, so a wedged emulator can say what each guest thread is parked on.
-            Common.Diagnostics.RunCounters.ThreadStateProvider =
+            global::Ryujinx.Common.Diagnostics.RunCounters.ThreadStateProvider =
                 () => Diagnostics.GuestThreadDump.Collect(KernelContext);
 
             Device = device;

@@ -29,7 +29,7 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
                 _context.CriticalSection.Leave();
             }
 
-            Common.Diagnostics.RunCounters.Syscall(id);
+            global::Ryujinx.Common.Diagnostics.RunCounters.Syscall(id);
 
             if (context.IsAarch32)
             {
