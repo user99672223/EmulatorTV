@@ -179,14 +179,43 @@ namespace Ryujinx.Cpu.LightningJit
             // This marker distinguishes "died entering translated code" from "died
             // somewhere else at the same moment" -- the two need completely different
             // fixes, and inference alone cannot separate them.
-            if (Interlocked.Exchange(ref _loggedFirstDispatch, 1) == 0)
+            bool firstDispatch = Interlocked.Exchange(ref _loggedFirstDispatch, 1) == 0;
+
+            if (firstDispatch)
             {
                 Logger.Notice.Print(LogClass.Cpu, $"Entering translated guest code for the first time at 0x{address:X}.");
             }
 
             Ryujinx.Common.Diagnostics.RunCounters.GuestDispatch();
 
-            Stubs.DispatchLoop(context.NativeContextPtr, address);
+            // Stubs is static and reassigned by every Translator construction -- one per
+            // guest process, and there are dozens of those. If the instance in use was
+            // built around a different process's function table, dispatch is already
+            // wrong before a single guest instruction runs, so record which instance
+            // this thread is about to use and whether it matches this translator.
+            TranslatorStubs stubs = Stubs;
+
+            if (firstDispatch)
+            {
+                Logger.Notice.Print(LogClass.Cpu,
+                    $"Dispatch about to resolve: stubs={stubs?.GetHashCode():X8} " +
+                    $"thisTranslatorTable={FunctionTable?.GetHashCode():X8} " +
+                    $"stubsTable={stubs?.TableIdentity:X8}");
+            }
+
+            // Reading this property forces the Lazy that GENERATES and MAPS the dispatch
+            // loop, which takes the JIT cache lock. Kept separate from the call so the log
+            // distinguishes "blocked generating/mapping the stub" from "generated code
+            // hung the moment it was entered" -- those need completely different fixes.
+            DispatcherFunction dispatchLoop = stubs.DispatchLoop;
+
+            if (firstDispatch)
+            {
+                Logger.Notice.Print(LogClass.Cpu,
+                    "Dispatch loop generated and mapped; entering guest code now.");
+            }
+
+            dispatchLoop(context.NativeContextPtr, address);
 
             if (Interlocked.Exchange(ref _loggedFirstReturn, 1) == 0)
             {

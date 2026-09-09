@@ -345,8 +345,14 @@ namespace Ryujinx.Cpu.LightningJit
         /// Generates a <see cref="DispatchLoop"/> function.
         /// </summary>
         /// <returns><see cref="DispatchLoop"/> function</returns>
+        /// <summary>Identity of the function table this instance was built around.</summary>
+        internal int TableIdentity => _functionTable?.GetHashCode() ?? 0;
+
         private DispatcherFunction GenerateDispatchLoop()
         {
+            Ryujinx.Common.Logging.Logger.Notice.Print(
+                Ryujinx.Common.Logging.LogClass.Cpu, "GenerateDispatchLoop: emitting.");
+
             CodeWriter writer = new();
 
             if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64)
@@ -389,7 +395,15 @@ namespace Ryujinx.Cpu.LightningJit
                 throw new PlatformNotSupportedException();
             }
 
+            Ryujinx.Common.Logging.Logger.Notice.Print(
+                Ryujinx.Common.Logging.LogClass.Cpu,
+                "GenerateDispatchLoop: emitted, mapping into the JIT cache (takes the cache lock).");
+
             IntPtr pointer = Map(writer.AsByteSpan());
+
+            Ryujinx.Common.Logging.Logger.Notice.Print(
+                Ryujinx.Common.Logging.LogClass.Cpu,
+                $"GenerateDispatchLoop: mapped at 0x{pointer:X}.");
 
             return Marshal.GetDelegateForFunctionPointer<DispatcherFunction>(pointer);
         }
