@@ -184,7 +184,8 @@ namespace Ryujinx.Memory
                     + $"(requested {size / 1024} KiB, after "
                     + $"{Volatile.Read(ref _sharedMemoryCount)} successful "
                     + $"allocations totalling "
-                    + $"{Interlocked.Read(ref _sharedMemoryBytes) / (1024 * 1024)} MiB)");
+                    + $"{Interlocked.Read(ref _sharedMemoryBytes) / (1024 * 1024)} MiB; "
+                    + $"task: {Ryujinx.Common.SystemInfo.AppleMemoryProbe.DescribeAddressSpace()})");
             }
 
             Interlocked.Increment(ref _sharedMemoryCount);

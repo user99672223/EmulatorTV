@@ -92,6 +92,50 @@ namespace Ryujinx.Common.SystemInfo
         public static bool IsSupported => OperatingSystem.IsIOS() || OperatingSystem.IsTvOS();
 
         /// <summary>
+        /// Virtual size, region count and footprint, as task_info reports them.
+        /// </summary>
+        /// <remarks>
+        /// When vm_allocate refuses a request while the process still has most of its
+        /// memory free, the refusal is about the address map rather than about bytes,
+        /// and these are the numbers that say which ceiling was reached: virtual_size
+        /// against an address space limit, region_count against a limit on how many
+        /// separate mappings a task may hold.
+        /// </remarks>
+        public static unsafe string DescribeAddressSpace()
+        {
+            if (!IsSupported)
+            {
+                return "(not an Apple target)";
+            }
+
+            byte[] buffer = new byte[TaskVmInfoBufferBytes];
+            uint count = TaskVmInfoBufferBytes / sizeof(uint);
+
+            fixed (byte* pointer = buffer)
+            {
+                if (TaskInfo(TaskSelfTrap(), TaskVmInfo, (IntPtr)pointer, ref count) != 0)
+                {
+                    return "(task_info failed)";
+                }
+            }
+
+            // virtual_size is the first field, then region_count and page_size as
+            // 4-byte integers, then resident_size.
+            ulong virtualSize = BitConverter.ToUInt64(buffer, 0);
+            int regionCount = BitConverter.ToInt32(buffer, 8);
+            int pageSize = BitConverter.ToInt32(buffer, 12);
+            ulong residentSize = BitConverter.ToUInt64(buffer, 16);
+
+            string footprint = count * sizeof(uint) >= PhysFootprintOffset + 8
+                ? $"{BitConverter.ToUInt64(buffer, PhysFootprintOffset) / Mib:F0} MiB"
+                : "unknown";
+
+            return $"virtual {virtualSize / Mib:F0} MiB, {regionCount} regions, "
+                + $"resident {residentSize / Mib:F0} MiB, footprint {footprint}, "
+                + $"page size {pageSize}";
+        }
+
+        /// <summary>
         /// Bytes remaining before the process hits its memory limit, or -1 if unavailable.
         /// </summary>
         public static long AvailableBytes()
