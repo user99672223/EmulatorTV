@@ -1,4 +1,4 @@
-﻿using CommandLine;
+using CommandLine;
 using LibHac.Tools.FsSystem;
 using Ryujinx.Audio.Backends.SDL2;
 using Ryujinx.Audio.Backends.Apple;
@@ -109,11 +109,17 @@ namespace Ryujinx.Headless.SDL2
 
                 Logger.Notice.Print(LogClass.Application, "Launch arguments: " + string.Join(' ', args));
 
-                // Before anything allocates, establish what this device actually grants.
-                // Every conclusion about executable memory so far has come from watching
-                // the emulator fail; this asks the kernel directly, once, at the moment
-                // that matters -- after the debugger attach has set CS_DEBUGGED.
-                Ryujinx.Memory.JitCapabilityProbe.Run();
+                // Opt-in only. The probe executes the memory it maps, and on this
+                // device the app-side dual mapping takes SIGBUS on instruction fetch
+                // even when the rx view reads back cur=r-x max=rwx. SIGBUS is a
+                // hardware fault, not a managed exception, so the try/catch below
+                // cannot contain it -- running the probe unconditionally killed the
+                // process before the JIT path was ever reached. It has already told
+                // us what we needed; keep it available, keep it off.
+                if (Environment.GetEnvironmentVariable("MELOTV_JITCAP") == "1")
+                {
+                    Ryujinx.Memory.JitCapabilityProbe.Run();
+                }
 
                 Main(args);
             }
