@@ -53,6 +53,9 @@ targets:
         DEFINES_MODULE: YES
         DYLIB_INSTALL_NAME_BASE: "@rpath"
         SKIP_INSTALL: NO
+        # Nothing inside the framework references these symbols -- the emulator
+        # reaches them by name at runtime -- so without this they are stripped.
+        DEAD_CODE_STRIPPING: NO
 
   MeloTV:
     type: application
