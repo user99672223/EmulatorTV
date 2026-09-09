@@ -53,11 +53,21 @@ struct MeloTVApp: App {
             // Leaving it off keeps the allocator on the mmap path.
             ("HAS_TXM", "0"),
 
-            // Selects RX-plus-RW-alias mappings instead of allocating RW and then
-            // mprotecting to RX. The latter is what a W^X-enforcing system rejects,
-            // and it is used by the JIT cache, the translator AND the SIGSEGV handler
-            // that host-tracked memory depends on.
-            ("DUAL_MAPPED_JIT", "1"),
+            // Off, deliberately, and this is a reversal.
+            //
+            // The dual-mapped path exists to obtain executable memory WITHOUT a debugger,
+            // which was the situation when it was selected: CS_DEBUGGED was clear and the
+            // kernel killed the process at the first guest instruction. That premise no
+            // longer holds. JIT is now enabled externally before the game starts, so
+            // CS_DEBUGGED is set and CS_HARD/CS_KILL are cleared, and the process may
+            // execute unsigned pages the ordinary way.
+            //
+            // With DUAL_MAPPED_JIT unset the translator uses NoWxCache instead -- the path
+            // upstream MeloNX actually ships on iOS, rather than this fork's bespoke
+            // dual-mapping. That matters because the dual-mapped dispatch code decodes as
+            // correct in every instruction yet never executes: the guest burns a full core
+            // without retiring a single instruction or reaching managed code.
+            ("DUAL_MAPPED_JIT", "0"),
 
             // Address space, not resident memory, is the binding constraint here: a
             // 1 GiB + 256 MiB JIT reservation on top of guest DRAM and the
