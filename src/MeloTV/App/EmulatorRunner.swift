@@ -21,7 +21,7 @@ final class EmulatorRunner: ObservableObject {
     /// Boots a title. The core's main loop blocks for the lifetime of the game,
     /// so it gets its own thread with a large stack; the UI thread stays free to
     /// service the SDL main-thread dispatcher the core installs on Apple targets.
-    func start(game: URL, applicationPoolMiB: Int, dramMiB: Int = 3072) {
+    func start(game: URL, applicationPoolMiB: Int, dramMiB: Int = 2048) {
         guard !isRunning, !isPreparing else { return }
         lastMessage = nil
 
@@ -64,11 +64,18 @@ final class EmulatorRunner: ObservableObject {
             args += ["--application-pool-mib", String(applicationPoolMiB)]
         }
 
-        // The emulated DRAM is reserved as one contiguous block of address space. At
-        // the stock 4096 MiB, that block plus the JIT caches plus the host-tracked page
-        // table overran the address space this process is allowed without the
-        // extended-virtual-addressing entitlement, which a free developer account
-        // cannot be granted. The pools still fit comfortably inside 3 GiB.
+        // The emulated DRAM is reserved as one contiguous block of address space,
+        // and it is the largest single thing the emulator spends its budget on.
+        //
+        // Measured: the process has about 7100 MiB of address space to grow into
+        // after launch (453478 MiB at launch, allocations refused at 460600), and
+        // the span between its lowest and highest mapping never changes -- so this
+        // is a budget, not a question of where things land. At 3072 MiB the DRAM
+        // block alone took nearly half of it, and guest memory ran out after
+        // 1019 MiB of partitions while only 325 MiB was resident.
+        //
+        // 2048 hands a full gigabyte of that back. The guest pools are sized from
+        // this, so it also caps how much the game can be told it has.
         if dramMiB > 0 {
             args += ["--dram-mib", String(dramMiB)]
         }
