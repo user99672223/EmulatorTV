@@ -69,6 +69,17 @@ struct MeloTVApp: App {
             // without retiring a single instruction or reaching managed code.
             ("DUAL_MAPPED_JIT", "0"),
 
+            // Skip the mach ownership remap for JIT memory.
+            //
+            // vm_region_64 measured the JIT pages as cur=r-- max=rw- while an ordinary
+            // allocation on the same device showed max=rwx, and the remap ran with every
+            // mach call succeeding. It is therefore the thing removing execute, not
+            // granting it: mach_make_memory_entry_64 cannot hand out VM_PROT_EXECUTE
+            // without dynamic-codesigning, and vm_map clamps its requested max to the
+            // entry rather than failing. Plain anonymous mmap already carries max=rwx,
+            // which is all that is needed now that CS_DEBUGGED is set.
+            ("JIT_OWNERSHIP_REMAP", "0"),
+
             // Address space, not resident memory, is the binding constraint here: a
             // 1 GiB + 256 MiB JIT reservation on top of guest DRAM and the
             // host-tracked page table exhausted it, and mmap returned ENOMEM with 2 GB

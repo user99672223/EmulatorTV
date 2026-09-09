@@ -60,7 +60,31 @@ namespace Ryujinx.Memory
                 throw new SystemException(Marshal.GetLastPInvokeErrorMessage());
             }
 
-            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && forJit)
+            // The ownership remap is what REMOVES execute here, rather than granting it.
+            //
+            // Measured on tvOS 27: this path runs, every mach call returns success, and the
+            // region still comes back max=rw-. An ordinary allocation on the same device
+            // gets max=rwx, because Darwin gives anonymous mmap VM_PROT_ALL as its maximum
+            // protection. So the plain mapping already permits execute and the memory entry
+            // does not: mach_make_memory_entry_64 cannot grant VM_PROT_EXECUTE without the
+            // dynamic-codesigning entitlement, which a free account cannot carry, and
+            // vm_map's requested max is then clamped to what the entry allows instead of
+            // failing. Skipping it leaves the mapping with max=rwx, which Commit's
+            // mprotect(RW|EXEC) can then actually reach.
+            //
+            // The cost of skipping is the ledger tagging, so emitted code counts toward the
+            // process footprint again. At ~320 MiB against a 2 GiB ceiling that is affordable.
+            bool skipOwnershipRemap =
+                Environment.GetEnvironmentVariable("JIT_OWNERSHIP_REMAP") == "0";
+
+            if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && forJit && skipOwnershipRemap)
+            {
+                Ryujinx.Common.Logging.Logger.Notice.Print(
+                    Ryujinx.Common.Logging.LogClass.Cpu,
+                    $"[JITMEM] skipping ownership remap at 0x{ptr:X} size 0x{size:X}; " +
+                    "relying on the mapping's own max protection.");
+            }
+            else if ((OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()) && forJit)
             {
                 // This is the only thing that makes a region executable on this platform.
                 // The JIT pages come back r--/max=rw-, so either this does not run or it
