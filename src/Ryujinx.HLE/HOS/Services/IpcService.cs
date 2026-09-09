@@ -141,6 +141,8 @@ namespace Ryujinx.HLE.HOS.Services
             context.ResponseData.BaseStream.Seek(_isDomain ? 0x20 : 0x10, SeekOrigin.Begin);
 
             Ryujinx.Common.Diagnostics.RunCounters.IpcCall(service.GetType().Name);
+            Ryujinx.Common.Logging.Logger.Notice.Print(Ryujinx.Common.Logging.LogClass.KernelIpc,
+                $"[IPC] {service.GetType().Name}.cmif{commandId}");
 
             ResultCode result = service.InvokeCmifMethod(commandId, context);
 
@@ -169,6 +171,8 @@ namespace Ryujinx.HLE.HOS.Services
             context.ResponseData.BaseStream.Seek(0x4, SeekOrigin.Begin);
 
             Ryujinx.Common.Diagnostics.RunCounters.IpcCall(GetType().Name);
+            Ryujinx.Common.Logging.Logger.Notice.Print(Ryujinx.Common.Logging.LogClass.KernelIpc,
+                $"[IPC] {GetType().Name}.tipc{commandId}");
 
             ResultCode result = InvokeTipcMethod(commandId, context);
 

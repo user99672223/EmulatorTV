@@ -29,6 +29,8 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
                 _context.CriticalSection.Leave();
             }
 
+            Common.Diagnostics.RunCounters.Syscall(id);
+
             if (context.IsAarch32)
             {
                 SyscallDispatch.Dispatch32(_context.Syscall, context, id);
