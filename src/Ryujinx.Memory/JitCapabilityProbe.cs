@@ -205,13 +205,13 @@ namespace Ryujinx.Memory
                 // max=rwx: the reservation is 2 GiB and carries MAP_NORESERVE.
                 Case("prop: 16K none", PROT_NONE, 0);
                 Case("prop: 16K none +NORESERVE", PROT_NONE, MAP_NORESERVE);
-                Case("prop: 256M none", PROT_NONE, 0, 256UL * 1024 * 1024);
-                Case("prop: 256M none +NORESERVE", PROT_NONE, MAP_NORESERVE, 256UL * 1024 * 1024);
-                Case("prop: 2G none", PROT_NONE, 0, 0x7FF00000UL);
-                Case("prop: 2G none +NORESERVE", PROT_NONE, MAP_NORESERVE, 0x7FF00000UL);
+                Case("prop: 256M none", PROT_NONE, 0, (nuint)(256 * 1024 * 1024));
+                Case("prop: 256M none +NORESERVE", PROT_NONE, MAP_NORESERVE, (nuint)(256 * 1024 * 1024));
+                Case("prop: 2G none", PROT_NONE, 0, (nuint)0x7FF00000);
+                Case("prop: 2G none +NORESERVE", PROT_NONE, MAP_NORESERVE, (nuint)0x7FF00000);
 
                 // And whether the flip still works inside a large reservation.
-                WriteThenExecute("exec: 256M rw->rx", 256UL * 1024 * 1024, 0);
+                WriteThenExecute("exec: 256M rw->rx", (nuint)(256 * 1024 * 1024), 0);
 
                 Logger.Notice.Print(LogClass.Cpu, "[JITCAP] probe complete");
             }
