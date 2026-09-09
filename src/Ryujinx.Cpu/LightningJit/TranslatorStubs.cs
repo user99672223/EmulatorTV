@@ -305,6 +305,9 @@ namespace Ryujinx.Cpu.LightningJit
                 Ryujinx.Common.Logging.LogClass.Cpu,
                 $"DispatchStub mapped at 0x{dispatchStubPtr:X}.");
 
+            Cache.VmProtectionProbe.Report("DispatchStub", dispatchStubPtr);
+            Cache.VmProtectionProbe.Report("functionTableBase", _functionTable.Base);
+
             return dispatchStubPtr;
         }
 
@@ -451,6 +454,30 @@ namespace Ryujinx.Cpu.LightningJit
             Ryujinx.Common.Logging.Logger.Notice.Print(
                 Ryujinx.Common.Logging.LogClass.Cpu,
                 $"GenerateDispatchLoop: mapped at 0x{pointer:X}.");
+
+            Cache.VmProtectionProbe.Report("DispatchLoop", pointer);
+
+            // Reading the first word back through the RX view proves the code is both
+            // visible and readable there. If the bytes differ from what was written, the
+            // two halves of the dual mapping are not aliasing the same physical pages.
+            unsafe
+            {
+                try
+                {
+                    uint firstWord = *(uint*)pointer;
+
+                    Ryujinx.Common.Logging.Logger.Notice.Print(
+                        Ryujinx.Common.Logging.LogClass.Cpu,
+                        $"DispatchLoop first word through RX view: 0x{firstWord:X8} " +
+                        $"(emitted 0x{writer.GetList()[0]:X8}).");
+                }
+                catch (Exception ex)
+                {
+                    Ryujinx.Common.Logging.Logger.Notice.Print(
+                        Ryujinx.Common.Logging.LogClass.Cpu,
+                        $"DispatchLoop RX view unreadable: {ex.GetType().Name}.");
+                }
+            }
 
             return Marshal.GetDelegateForFunctionPointer<DispatcherFunction>(pointer);
         }
