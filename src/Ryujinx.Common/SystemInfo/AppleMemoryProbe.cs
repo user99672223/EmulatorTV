@@ -130,9 +130,17 @@ namespace Ryujinx.Common.SystemInfo
                 ? $"{BitConverter.ToUInt64(buffer, PhysFootprintOffset) / Mib:F0} MiB"
                 : "unknown";
 
+            // min_address and max_address sit right after phys_footprint, whose
+            // offset is already known good. They say whether "virtual" is a span
+            // between the lowest and highest thing mapped -- which would make the
+            // ceiling a limit on where allocations may be placed -- or a total.
+            string span = count * sizeof(uint) >= 168
+                ? $", span 0x{BitConverter.ToUInt64(buffer, 152):X}-0x{BitConverter.ToUInt64(buffer, 160):X}"
+                : string.Empty;
+
             return $"virtual {virtualSize / Mib:F0} MiB, {regionCount} regions, "
                 + $"resident {residentSize / Mib:F0} MiB, footprint {footprint}, "
-                + $"page size {pageSize}";
+                + $"page size {pageSize}{span}";
         }
 
         /// <summary>

@@ -46,9 +46,13 @@ namespace Ryujinx.Cpu.Jit.HostTracked
                 return mib * 1024 * 1024;
             }
 
-            return (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
-                ? 64UL * 1024 * 1024
-                : 1UL << 20;
+            // 1 MiB, as upstream. This was raised to 64 MiB on a theory about the
+            // address map that measurement later disproved, and the raise costs
+            // real budget: every partition rounds its backing allocation up to the
+            // block size, so 64 MiB blocks had 1088 MiB allocated against 424 MiB
+            // resident. Where the budget is the binding constraint, rounding waste
+            // is the last thing to spend it on.
+            return 1UL << 20;
         }
 
         private enum MappingType : byte
