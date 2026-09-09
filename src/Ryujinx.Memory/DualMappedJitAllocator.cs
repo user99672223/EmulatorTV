@@ -72,7 +72,29 @@ namespace Ryujinx.Memory
 
             if (hasTXM)
             {
-                _mmapPtr = BreakGetJITMapping((nuint)Size);
+                // If the trap stubs cannot be reached at all, say so here rather than
+                // letting the exception surface as a translation failure: the caller
+                // responds to that by substituting NOP;RET for the guest function, and
+                // the resulting fault points at a JIT page rather than at this.
+                try
+                {
+                    _mmapPtr = BreakGetJITMapping((nuint)Size);
+                }
+                catch (DllNotFoundException ex)
+                {
+                    Logger.Error?.Print(LogClass.Cpu,
+                        $"BreakpointJIT is unreachable, so JIT memory cannot be requested "
+                        + $"from the debugger: {ex.Message}");
+
+                    throw;
+                }
+                catch (EntryPointNotFoundException ex)
+                {
+                    Logger.Error?.Print(LogClass.Cpu,
+                        $"BreakpointJIT loaded but a trap stub is missing: {ex.Message}");
+
+                    throw;
+                }
             }
             else
             {

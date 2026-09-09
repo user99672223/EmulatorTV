@@ -40,6 +40,12 @@ namespace Ryujinx.Headless.SDL2
             // name; map those to the same absolute locations.
             ["SDL2.framework/SDL2"] = "SDL2.framework/SDL2",
             ["RyujinxHelper.framework/RyujinxHelper"] = "RyujinxHelper.framework/RyujinxHelper",
+            // Ryujinx.Memory imports this for the JIT allocation traps. Without the
+            // mapping the DllImport does not resolve, the allocator's catch replaces the
+            // guest function with NOP;RET, and the guest faults jumping into a JIT page
+            // that was never made executable -- which reads as a crash a long way from
+            // the actual cause.
+            ["BreakpointJIT.framework/BreakpointJIT"] = "BreakpointJIT.framework/BreakpointJIT",
         };
 
         public static void Register()
