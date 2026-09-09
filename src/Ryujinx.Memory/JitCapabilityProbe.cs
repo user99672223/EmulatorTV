@@ -31,6 +31,7 @@ namespace Ryujinx.Memory
         private const int MAP_PRIVATE = 0x0002;
         private const int MAP_ANON = 0x1000;
         private const int MAP_JIT = 0x0800;
+        private const int MAP_NORESERVE = 0x0040;
 
         private const int BasicInfo64 = 9;
         private const uint BasicInfo64Count = 9;
@@ -99,98 +100,82 @@ namespace Ryujinx.Memory
 
         private const nuint TestSize = 16384;
 
-        private static void Case(string name, int prot, int extraFlags)
+        private static void Case(string name, int prot, int extraFlags, nuint size = TestSize)
         {
-            IntPtr ptr = Mmap(IntPtr.Zero, TestSize, prot, MAP_ANON | MAP_PRIVATE | extraFlags, -1, 0);
+            IntPtr ptr = Mmap(IntPtr.Zero, size, prot, MAP_ANON | MAP_PRIVATE | extraFlags, -1, 0);
 
             if (ptr == new IntPtr(-1))
             {
                 Logger.Notice.Print(LogClass.Cpu,
-                    $"[JITCAP] {name,-26} mmap FAILED errno={Marshal.GetLastPInvokeError()}");
+                    $"[JITCAP] {name,-34} mmap FAILED errno={Marshal.GetLastPInvokeError()}");
 
                 return;
             }
 
-            Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-26} mmap ok at 0x{ptr:X} -> {Actual(ptr)}");
+            Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} ok at 0x{ptr:X} -> {Actual(ptr)}");
 
-            Munmap(ptr, TestSize);
+            Munmap(ptr, size);
         }
 
         /// <summary>
-        /// Allocates, writes a RET, and calls it. This is the only test that proves the
-        /// CPU will actually fetch instructions from the region.
+        /// The only strategy the earlier results leave open, and the one NoWxCache already
+        /// implements: map read/write, write the code, flip the page to read/execute, call
+        /// it. W^X is enforced here -- asking mmap for rwx yields rw- -- but every small
+        /// mapping reports max=rwx, so the flip should be permitted.
         /// </summary>
-        private static void ExecuteCase(string name, int prot, int extraFlags, bool viaMprotect)
+        private static void WriteThenExecute(string name, nuint size, int extraFlags)
         {
-            IntPtr ptr = Mmap(IntPtr.Zero, TestSize, prot, MAP_ANON | MAP_PRIVATE | extraFlags, -1, 0);
+            IntPtr ptr = Mmap(IntPtr.Zero, size, PROT_READ | PROT_WRITE,
+                MAP_ANON | MAP_PRIVATE | extraFlags, -1, 0);
 
             if (ptr == new IntPtr(-1))
             {
                 Logger.Notice.Print(LogClass.Cpu,
-                    $"[JITCAP] {name,-26} mmap FAILED errno={Marshal.GetLastPInvokeError()}");
+                    $"[JITCAP] {name,-34} mmap FAILED errno={Marshal.GetLastPInvokeError()}");
 
                 return;
             }
 
             try
             {
-                if (extraFlags == MAP_JIT)
+                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} mapped rw -> {Actual(ptr)}");
+
+                Marshal.WriteInt32(ptr, unchecked((int)0xD65F03C0));    // AArch64 RET
+
+                if (Mprotect(ptr, size, PROT_READ | PROT_EXEC) != 0)
                 {
-                    try
-                    {
-                        PthreadJitWriteProtect(0);
-                    }
-                    catch
-                    {
-                        // Absent on this platform; not fatal for the experiment.
-                    }
+                    Logger.Notice.Print(LogClass.Cpu,
+                        $"[JITCAP] {name,-34} mprotect r-x FAILED errno={Marshal.GetLastPInvokeError()} ({Actual(ptr)})");
+
+                    return;
                 }
 
-                // AArch64 RET.
-                Marshal.WriteInt32(ptr, unchecked((int)0xD65F03C0));
+                string after = Actual(ptr);
 
-                if (viaMprotect)
+                if (!after.Contains("cur=r-x"))
                 {
-                    int result = Mprotect(ptr, TestSize, PROT_READ | PROT_EXEC);
+                    Logger.Notice.Print(LogClass.Cpu,
+                        $"[JITCAP] {name,-34} mprotect returned ok but page is {after}; NOT calling it");
 
-                    if (result != 0)
-                    {
-                        Logger.Notice.Print(LogClass.Cpu,
-                            $"[JITCAP] {name,-26} mprotect to r-x FAILED errno={Marshal.GetLastPInvokeError()} ({Actual(ptr)})");
-
-                        return;
-                    }
+                    return;
                 }
 
-                if (extraFlags == MAP_JIT)
-                {
-                    try
-                    {
-                        PthreadJitWriteProtect(1);
-                    }
-                    catch
-                    {
-                    }
-                }
+                SysIcacheInvalidate(ptr, size);
 
-                SysIcacheInvalidate(ptr, TestSize);
+                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} now {after}, calling it");
+
+                Marshal.GetDelegateForFunctionPointer<Action>(ptr)();
 
                 Logger.Notice.Print(LogClass.Cpu,
-                    $"[JITCAP] {name,-26} about to CALL it ({Actual(ptr)})");
-
-                Action call = Marshal.GetDelegateForFunctionPointer<Action>(ptr);
-                call();
-
-                Logger.Notice.Print(LogClass.Cpu,
-                    $"[JITCAP] {name,-26} EXECUTED SUCCESSFULLY -- this region is usable for JIT");
+                    $"[JITCAP] {name,-34} EXECUTED SUCCESSFULLY -- usable for JIT");
             }
             catch (Exception ex)
             {
-                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-26} threw: {ex.GetType().Name}: {ex.Message}");
+                Logger.Notice.Print(LogClass.Cpu, $"[JITCAP] {name,-34} threw: {ex.GetType().Name}");
             }
             finally
             {
-                Munmap(ptr, TestSize);
+                Munmap(ptr, size);
             }
         }
 
@@ -211,16 +196,22 @@ namespace Ryujinx.Memory
             {
                 Logger.Notice.Print(LogClass.Cpu, "[JITCAP] probing what this device grants for executable memory");
 
-                Case("mmap rw", PROT_READ | PROT_WRITE, 0);
-                Case("mmap rwx", PROT_READ | PROT_WRITE | PROT_EXEC, 0);
-                Case("mmap rx", PROT_READ | PROT_EXEC, 0);
-                Case("mmap none", PROT_NONE, 0);
-                Case("mmap rw + MAP_JIT", PROT_READ | PROT_WRITE, MAP_JIT);
-                Case("mmap rwx + MAP_JIT", PROT_READ | PROT_WRITE | PROT_EXEC, MAP_JIT);
+                // The decisive test first. The previous run died inside a later case
+                // before reaching this one, which is the strategy the JIT actually needs.
+                WriteThenExecute("exec: 16K rw->rx", 16384, 0);
+                WriteThenExecute("exec: 16K rw->rx +NORESERVE", 16384, MAP_NORESERVE);
 
-                ExecuteCase("exec: rwx direct", PROT_READ | PROT_WRITE | PROT_EXEC, 0, viaMprotect: false);
-                ExecuteCase("exec: rw then mprotect rx", PROT_READ | PROT_WRITE, 0, viaMprotect: true);
-                ExecuteCase("exec: MAP_JIT rwx", PROT_READ | PROT_WRITE | PROT_EXEC, MAP_JIT, viaMprotect: false);
+                // Why the real JIT region measured max=rw- while these small maps get
+                // max=rwx: the reservation is 2 GiB and carries MAP_NORESERVE.
+                Case("prop: 16K none", PROT_NONE, 0);
+                Case("prop: 16K none +NORESERVE", PROT_NONE, MAP_NORESERVE);
+                Case("prop: 256M none", PROT_NONE, 0, 256UL * 1024 * 1024);
+                Case("prop: 256M none +NORESERVE", PROT_NONE, MAP_NORESERVE, 256UL * 1024 * 1024);
+                Case("prop: 2G none", PROT_NONE, 0, 0x7FF00000UL);
+                Case("prop: 2G none +NORESERVE", PROT_NONE, MAP_NORESERVE, 0x7FF00000UL);
+
+                // And whether the flip still works inside a large reservation.
+                WriteThenExecute("exec: 256M rw->rx", 256UL * 1024 * 1024, 0);
 
                 Logger.Notice.Print(LogClass.Cpu, "[JITCAP] probe complete");
             }
