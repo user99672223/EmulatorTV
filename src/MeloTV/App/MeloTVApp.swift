@@ -23,11 +23,19 @@ struct MeloTVApp: App {
 
         RyujinxBridge.initialize()
 
-        // Primes the dual-mapped JIT translator. Doing it here rather than at game
-        // boot means the log says immediately whether executable memory can be had
-        // at all on this device, instead of failing much later inside a game load.
-        let dualMapped = RyujinxBridge.initialize_dualmapped()
-        MeloTVApp.log("dual-mapped JIT init returned \(dualMapped)")
+        // Deliberately NOT priming the JIT here any more.
+        //
+        // It used to call initialize_dualmapped() so the log would say immediately
+        // whether executable memory could be had. With HAS_TXM=1 that is now the wrong
+        // thing to do at the wrong time: allocation goes through a BRK that an attached
+        // debugger has to service, and at launch nothing is attached yet -- the script
+        // cannot connect to a process that does not exist. The trap would raise SIGTRAP
+        // with no handler and kill the app before the Start button was reachable.
+        //
+        // Allocation is left to happen at game start, by which point the script is
+        // attached and serving. The translator creates the cache lazily anyway, and the
+        // signal handler's own code mapping goes through the same allocator, so deferring
+        // this defers both.
     }
 
     var body: some Scene {
