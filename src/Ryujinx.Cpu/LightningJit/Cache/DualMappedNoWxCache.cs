@@ -284,6 +284,11 @@ namespace Ryujinx.Cpu.LightningJit.Cache
 
                     ClearThreadLocalCache(framePointer);
 
+                    if (DebuggerJitPublisher.Required && funcPtr != IntPtr.Zero)
+                    {
+                        return ShareInsteadOfCopying(guestAddress, funcPtr, code.Length);
+                    }
+
                     return AddThreadLocalFunction(code, guestAddress);
                 }
             }
@@ -319,6 +324,11 @@ namespace Ryujinx.Cpu.LightningJit.Cache
                     _functionMetadata[guestAddress] = new FunctionMetadata(guestAddress, funcOffset, code.Length);
 
                     ClearThreadLocalCache(framePointer);
+
+                    if (DebuggerJitPublisher.Required && funcPtr != IntPtr.Zero)
+                    {
+                        return ShareInsteadOfCopying(guestAddress, funcPtr, code.Length);
+                    }
 
                     return AddThreadLocalFunction(code, guestAddress);
                 }
@@ -443,6 +453,13 @@ namespace Ryujinx.Cpu.LightningJit.Cache
             {
                 _threadLocalCache.Remove(address);
 
+                if (entry.Offset < 0)
+                {
+                    // Points into the shared cache, so there is nothing local to give
+                    // back; freeing at a negative offset would corrupt the free list.
+                    continue;
+                }
+
                 int sizeAligned = BitUtils.AlignUp(entry.Size, pageSize);
                 _localCache.Free(entry.Offset, sizeAligned);
             }
@@ -461,6 +478,13 @@ namespace Ryujinx.Cpu.LightningJit.Cache
 
             foreach ((_, ThreadLocalCacheEntry entry) in _threadLocalCache)
             {
+                if (entry.Offset < 0)
+                {
+                    // Points into the shared cache, so there is nothing local to give
+                    // back; freeing at a negative offset would corrupt the free list.
+                    continue;
+                }
+
                 int sizeAligned = BitUtils.AlignUp(entry.Size, pageSize);
                 _localCache.Free(entry.Offset, sizeAligned);
             }
@@ -491,6 +515,32 @@ namespace Ryujinx.Cpu.LightningJit.Cache
             {
                 code.CopyTo(new Span<byte>((void*)rwPointer, code.Length));
             }
+        }
+
+        /// <summary>
+        /// Records the shared-cache copy as this thread's copy instead of making a
+        /// second one, and returns it.
+        /// </summary>
+        /// <remarks>
+        /// The thread-local cache exists because on a W^X platform a shared page cannot
+        /// be executed until it is full and has been reprotected, so a freshly
+        /// translated function needs its own already-executable page to run from.
+        /// Publishing through the debugger makes the shared copy executable as soon as
+        /// it is written, so the second copy buys nothing -- and it is not free. It is a
+        /// second publish, and every publish is a round trip to the host. Measured on
+        /// device the two copies were exactly half of them: the script reported 2.3
+        /// publishes a second against the emulator's own 1.1 translations.
+        ///
+        /// The dictionary entry still has to exist. Until the page fills and
+        /// RegisterFunction runs this is the only place the address can be found, and
+        /// without it the same function is retranslated on every call. Offset -1 marks
+        /// an entry that owns no local storage.
+        /// </remarks>
+        private static IntPtr ShareInsteadOfCopying(ulong guestAddress, IntPtr funcPtr, int size)
+        {
+            (_threadLocalCache ??= new()).TryAdd(guestAddress, new(-1, size, funcPtr));
+
+            return funcPtr;
         }
 
         private unsafe IntPtr AddThreadLocalFunction(ReadOnlySpan<byte> code, ulong guestAddress)
@@ -569,6 +619,13 @@ namespace Ryujinx.Cpu.LightningJit.Cache
                     {
                         _threadLocalCache.Remove(addr);
                         
+                        if (entry.Offset < 0)
+                        {
+                            // Points into the shared cache, so there is nothing local to give
+                            // back; freeing at a negative offset would corrupt the free list.
+                            continue;
+                        }
+
                         int sizeAligned = BitUtils.AlignUp(entry.Size, pageSize);
                         _localCache.Free(entry.Offset, sizeAligned);
                     }
