@@ -2,7 +2,6 @@ using ARMeilleure.Memory;
 using Ryujinx.Common.Logging;
 using Ryujinx.Cpu.LightningJit.State;
 using System;
-using System.Threading;
 
 namespace Ryujinx.Cpu.LightningJit
 {
@@ -71,7 +70,7 @@ namespace Ryujinx.Cpu.LightningJit
             // reverse-P/Invoke thunk. If the emulator wedges after entering the dispatch
             // loop and this never fires, the hang is entirely inside native dispatch and
             // the managed translation path was never involved.
-            if (Interlocked.Exchange(ref _loggedFirstFunctionAddress, 1) == 0)
+            if (System.Threading.Interlocked.Exchange(ref _loggedFirstFunctionAddress, 1) == 0)
             {
                 Logger.Notice.Print(LogClass.Cpu,
                     $"Native dispatch reached managed GetFunctionAddress for 0x{address:X}.");
