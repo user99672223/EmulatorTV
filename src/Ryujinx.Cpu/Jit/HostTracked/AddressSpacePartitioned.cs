@@ -12,6 +12,53 @@ namespace Ryujinx.Cpu.Jit.HostTracked
         private const int PartitionBits = 25;
         private const ulong PartitionSize = 1UL << PartitionBits;
 
+        // A partition is backed by one vm_allocate, because its private mapping
+        // tree starts as a single node spanning the whole thing. PartitionSize is
+        // only an alignment, so a guest that maps a large range in one go used to
+        // produce one partition exactly that big -- Rocket League asked for a range
+        // that became a 1 GiB allocation, and tvOS answered KERN_NO_SPACE while the
+        // process still had 1.7 GiB free and only two other blocks allocated.
+        //
+        // Capping it splits that into several partitions, each its own allocation of
+        // a size the kernel will actually grant.
+        private static readonly ulong MaxPartitionSize = MaxPartitionSizeFromEnv();
+
+        private static ulong MaxPartitionSizeFromEnv()
+        {
+            string value = Environment.GetEnvironmentVariable("AS_MAX_PARTITION_MIB");
+
+            if (ulong.TryParse(value, out ulong mib) && mib > 0)
+            {
+                return BitUtils.AlignUp(mib * 1024 * 1024, PartitionSize);
+            }
+
+            return (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+                ? 64UL * 1024 * 1024
+                : ulong.MaxValue;
+        }
+
+        /// <summary>
+        /// Inserts partitions covering [va, va + size), none larger than
+        /// <see cref="MaxPartitionSize"/>, and returns how many were added.
+        /// </summary>
+        private int InsertPartitions(int index, ulong va, ulong size)
+        {
+            int inserted = 0;
+
+            while (size > 0)
+            {
+                ulong chunk = Math.Min(size, MaxPartitionSize);
+
+                _partitions.Insert(index + inserted, CreateAsPartition(va, chunk));
+
+                va += chunk;
+                size -= chunk;
+                inserted++;
+            }
+
+            return inserted;
+        }
+
         private readonly MemoryBlock _backingMemory;
         private readonly List<AddressSpacePartition> _partitions;
         private readonly AddressSpacePartitionAllocator _asAllocator;
@@ -331,9 +378,8 @@ namespace Ryujinx.Cpu.Jit.HostTracked
                         gapSize = endVa - partition.EndAddress;
                     }
 
-                    _partitions.Insert(i + 1, CreateAsPartition(partition.EndAddress, gapSize));
+                    i += InsertPartitions(i + 1, partition.EndAddress, gapSize);
                     va = partition.EndAddress + gapSize;
-                    i++;
                 }
                 else if (partition.EndAddress > va)
                 {
@@ -350,15 +396,14 @@ namespace Ryujinx.Cpu.Jit.HostTracked
                         gapSize = endVa - va;
                     }
 
-                    _partitions.Insert(i, CreateAsPartition(va, gapSize));
+                    i += InsertPartitions(i, va, gapSize);
                     va = Math.Min(partition.EndAddress, endVa);
-                    i++;
                 }
             }
 
             if (va < endVa)
             {
-                _partitions.Add(CreateAsPartition(va, endVa - va));
+                InsertPartitions(_partitions.Count, va, endVa - va);
             }
 
             ValidatePartitionList();
