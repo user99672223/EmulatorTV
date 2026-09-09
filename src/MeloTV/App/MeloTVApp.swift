@@ -119,14 +119,20 @@ struct MeloTVApp: App {
             // host-tracked page table exhausted it, and mmap returned ENOMEM with 2 GB
             // of jetsam headroom still free. These are caches, so a smaller reservation
             // costs eviction churn rather than correctness.
-            // Cut from 256/64 on purpose. These are now allocated by the debugger
-            // through debugserver's _M packet, which was only ever verified at 4 KiB;
-            // whether it will hand back a quarter of a gigabyte is unknown, and a
-            // refusal there stops the boot before anything else can be learned.
-            // Smaller caches cost eviction churn in a long session, not correctness,
-            // and can be raised again once an allocation of this shape is known to work.
-            ("JIT_SHARED_CACHE_MIB", "64"),
-            ("JIT_LOCAL_CACHE_MIB", "16"),
+            // As small as is still useful, on purpose.
+            //
+            // These are allocated by the debugger through debugserver's _M packet, which
+            // has only ever been verified at 4 KiB. Anything larger tests the size rather
+            // than the mechanism: a refusal at 256 MiB would say nothing about whether
+            // asking the debugger for JIT memory works at all, and would stop the boot
+            // before vm_remap, write visibility through the alias, or guest execution
+            // could be observed. 4 MiB still holds thousands of translated functions,
+            // which is far more than reaching the entry point needs.
+            //
+            // The cost of small caches is eviction churn in a long session, not
+            // correctness. Raise them once an allocation of this shape is known to work.
+            ("JIT_SHARED_CACHE_MIB", "4"),
+            ("JIT_LOCAL_CACHE_MIB", "1"),
         ]
 
         for (key, value) in vars {
