@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -33,6 +34,19 @@ namespace Ryujinx.Common.Diagnostics
         private static long _fifoWork;
         private static long _framesPresented;
         private static long _ipcCalls;
+        private static long _nopFallbacks;
+
+        /// <summary>
+        /// Set by the emulator side, which is the only layer that can see the guest
+        /// kernel. Left null here so this stays free of a dependency on HLE.
+        /// </summary>
+        public static Func<string[]> ThreadStateProvider { get; set; }
+
+        /// <summary>
+        /// True when the last interval saw no GPU work and no presented frames, i.e.
+        /// exactly the situation a thread dump is worth printing for.
+        /// </summary>
+        public static bool LastIntervalIdle { get; private set; }
 
         // Bounded on purpose: a runaway retry loop concentrates on a handful of names,
         // and an unbounded dictionary on the IPC path would be its own problem.
@@ -43,6 +57,11 @@ namespace Ryujinx.Common.Diagnostics
         public static void Translation() => Interlocked.Increment(ref _translations);
         public static void FifoWork() => Interlocked.Increment(ref _fifoWork);
         public static void FramePresented() => Interlocked.Increment(ref _framesPresented);
+
+        /// A guest function that failed to compile and was replaced by NOP;RET. The
+        /// guest keeps running but that function does nothing, so any non-zero value
+        /// here means the emulation is already wrong, whatever the screen shows.
+        public static void NopFallback() => Interlocked.Increment(ref _nopFallbacks);
 
         public static void IpcCall(string serviceName)
         {
@@ -61,7 +80,7 @@ namespace Ryujinx.Common.Diagnostics
             _ipcByService.AddOrUpdate(serviceName, 1, (_, count) => count + 1);
         }
 
-        private static long _lastGuest, _lastTranslations, _lastFifo, _lastFrames, _lastIpc;
+        private static long _lastGuest, _lastTranslations, _lastFifo, _lastFrames, _lastIpc, _lastNops;
 
         /// <summary>
         /// One line of deltas since the previous call, plus the busiest services. Naming
@@ -75,14 +94,20 @@ namespace Ryujinx.Common.Diagnostics
             long fifo = Interlocked.Read(ref _fifoWork);
             long frames = Interlocked.Read(ref _framesPresented);
             long ipc = Interlocked.Read(ref _ipcCalls);
+            long nops = Interlocked.Read(ref _nopFallbacks);
+
+            LastIntervalIdle = (fifo - _lastFifo) == 0 && (frames - _lastFrames) == 0;
 
             string line = string.Format(
-                "threads {0}  jit {1}  fifo {2}  frames {3}  ipc {4}",
+                "threads {0}  jit {1}  fifo {2}  frames {3}  ipc {4}  nop {5}",
                 guest - _lastGuest,
                 translations - _lastTranslations,
                 fifo - _lastFifo,
                 frames - _lastFrames,
-                ipc - _lastIpc);
+                ipc - _lastIpc,
+                nops - _lastNops);
+
+            _lastNops = nops;
 
             _lastGuest = guest;
             _lastTranslations = translations;

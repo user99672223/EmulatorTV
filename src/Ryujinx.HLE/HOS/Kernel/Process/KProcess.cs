@@ -852,6 +852,22 @@ namespace Ryujinx.HLE.HOS.Kernel.Process
             }
         }
 
+        /// <summary>
+        /// A copy of the thread list, for diagnostics. Taken under the same lock as
+        /// AddThread/RemoveThread and copied immediately, so a caller inspecting thread
+        /// state can never hold the process lock while doing so -- a diagnostic that
+        /// deadlocks the thing it is diagnosing is worse than no diagnostic.
+        /// </summary>
+        public KThread[] GetThreadsSnapshot()
+        {
+            lock (_threadingLock)
+            {
+                KThread[] threads = new KThread[_threads.Count];
+                _threads.CopyTo(threads, 0);
+                return threads;
+            }
+        }
+
         public void RemoveThread(KThread thread)
         {
             lock (_threadingLock)

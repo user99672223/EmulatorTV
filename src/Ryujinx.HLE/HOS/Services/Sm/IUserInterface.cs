@@ -63,6 +63,12 @@ namespace Ryujinx.HLE.HOS.Services.Sm
 
             KSession session = new(context.Device.System.KernelContext);
 
+            // Every sm:GetService, by name, at Notice. There are only a few dozen of
+            // these in a whole boot, and the last one before a freeze is the most
+            // useful single line in the log -- far cheaper than --enable-debug-logs,
+            // which would answer the same question inside a flood.
+            Logger.Notice.Print(LogClass.Service, $"[SM] GetService(\"{name}\")");
+
             if (_registry.TryGetService(name, out KPort port))
             {
                 Result result = port.EnqueueIncomingSession(session.ServerSession);

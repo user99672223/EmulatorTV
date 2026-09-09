@@ -212,6 +212,8 @@ namespace Ryujinx.Cpu.LightningJit
                         return funcPtr;
                     }
 
+                    Ryujinx.Common.Diagnostics.RunCounters.Translation();
+
                     CompiledFunction func = Compile(address, mode);
                     guestCodeLength = func.Code.Length;
                     return _noWxCache.Map(framePointer, func.Code, address, (ulong)func.GuestCodeLength);
@@ -222,6 +224,8 @@ namespace Ryujinx.Cpu.LightningJit
                     {
                         return funcPtr;
                     }
+
+                    Ryujinx.Common.Diagnostics.RunCounters.Translation();
 
                     CompiledFunction func = Compile(address, mode);
                     guestCodeLength = func.Code.Length;
@@ -246,7 +250,9 @@ namespace Ryujinx.Cpu.LightningJit
                     $"  Stack trace: {ex.StackTrace}";
                     
                 
-                Logger.Info?.Print(LogClass.Cpu, diagnosticInfo);
+                Ryujinx.Common.Diagnostics.RunCounters.NopFallback();
+
+                Logger.Warning?.Print(LogClass.Cpu, diagnosticInfo);
                 int nopLength = guestCodeLength > 0 ? guestCodeLength : 4;
                 return CreateNopFunction(framePointer, address, mode, nopLength);
             }
@@ -334,12 +340,6 @@ namespace Ryujinx.Cpu.LightningJit
 
         private TranslatedFunction Translate(ulong address, ExecutionMode mode)
         {
-            // New code being compiled means the guest is reaching instructions it has
-            // not run before, i.e. it is making progress. A guest spinning inside code
-            // it already translated shows zero here, which is the difference between
-            // "stuck in a retry loop" and "advancing slowly".
-            Ryujinx.Common.Diagnostics.RunCounters.Translation();
-
             CompiledFunction func = Compile(address, mode);
             IntPtr funcPointer = JitCache.Map(func.Code);
 

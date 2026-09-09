@@ -230,6 +230,21 @@ namespace Ryujinx.Common.SystemInfo
                     // the interval rather than nothing having happened since boot.
                     Logger.Notice.Print(LogClass.Application,
                         $"[RUN] t+{seconds}s  {Diagnostics.RunCounters.SampleDelta()}");
+
+                    // Only while nothing is reaching the screen. During normal play this
+                    // stays silent instead of printing a wall of threads every interval.
+                    if (Diagnostics.RunCounters.LastIntervalIdle)
+                    {
+                        string[] dump = Diagnostics.RunCounters.ThreadStateProvider?.Invoke();
+
+                        if (dump != null)
+                        {
+                            foreach (string entry in dump)
+                            {
+                                Logger.Notice.Print(LogClass.Application, entry);
+                            }
+                        }
+                    }
                 }
                 catch
                 {
