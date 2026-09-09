@@ -48,4 +48,24 @@ __asm__(
     "_BreakMarkJITMapping:\n"
     "    brk  #0x69\n"
     "    ret\n"
+
+    // void BreakPublishJIT(void *dst, const void *src, size_t len)
+    //   x0 = destination inside the debugger's rx region
+    //   x1 = source, ordinary readable memory
+    //   x2 = byte count
+    //
+    // Getting the region is not enough: a page stays executable only while
+    // the app does not write to it. Measured on this device, inside ONE 4 MiB
+    // region the debugger allocated rx -- a page the app wrote through its own
+    // vm_remap rw alias faults EXC_BAD_ACCESS on instruction fetch, while a
+    // page the debugger wrote with an M packet executes and reports
+    // EXC_BREAKPOINT. The rx view reads back the correct bytes either way, so
+    // nothing short of running the code tells them apart.
+    //
+    // So the app stages the code in ordinary memory and asks the debugger to
+    // place it. That is the only write path that leaves a page executable.
+    ".globl _BreakPublishJIT\n"
+    "_BreakPublishJIT:\n"
+    "    brk  #0x70\n"
+    "    ret\n"
 );

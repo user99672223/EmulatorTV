@@ -273,9 +273,8 @@ namespace Ryujinx.Cpu.LightningJit.Cache
                             }
                         }
 
-                        funcPtr = _sharedCache.Pointer + funcOffset;
-                        code.CopyTo(new Span<byte>((void*)funcPtr, code.Length));
                         funcPtr = _sharedCache.RxPointer + funcOffset;
+                        WriteCode(_sharedCache.Pointer + funcOffset, funcPtr, code);
 
                         TranslatedFunction function = new(funcPtr, guestSize);
 
@@ -311,9 +310,8 @@ namespace Ryujinx.Cpu.LightningJit.Cache
                         }
                     }
 
-                    funcPtr = _sharedCache.Pointer + funcOffset;
-                    code.CopyTo(new Span<byte>((void*)funcPtr, code.Length));
                     funcPtr = _sharedCache.RxPointer + funcOffset;
+                    WriteCode(_sharedCache.Pointer + funcOffset, funcPtr, code);
 
                     TranslatedFunction function = new(funcPtr, guestSize);
 
@@ -355,9 +353,8 @@ namespace Ryujinx.Cpu.LightningJit.Cache
                 
                 Debug.Assert((funcOffset & ((int)MemoryBlock.GetPageSize() - 1)) == 0);
 
-                IntPtr funcPtr = _sharedCache.Pointer + funcOffset;
-                code.CopyTo(new Span<byte>((void*)funcPtr, code.Length));
-                funcPtr = _sharedCache.RxPointer + funcOffset;
+                IntPtr funcPtr = _sharedCache.RxPointer + funcOffset;
+                WriteCode(_sharedCache.Pointer + funcOffset, funcPtr, code);
 
                 _sharedCache.SysIcacheInvalidate(funcOffset, sizeAligned);
 
@@ -472,6 +469,30 @@ namespace Ryujinx.Cpu.LightningJit.Cache
             _threadLocalCache = null;
         }
 
+        /// <summary>
+        /// Puts <paramref name="code"/> at a JIT cache offset, by whichever route
+        /// actually yields an executable page on this device.
+        /// </summary>
+        /// <remarks>
+        /// Writing through the rw alias is the fast path and the normal one, but on a
+        /// device with a Trusted Execution Monitor it silently destroys the page: the
+        /// rx view keeps reading back the emitted bytes while the instruction fetch
+        /// faults EXC_BAD_ACCESS. Measured in one region, a page the debugger wrote
+        /// executed and a page written here did not. So when the debugger is serving,
+        /// hand it the bytes instead.
+        /// </remarks>
+        private static unsafe void WriteCode(IntPtr rwPointer, IntPtr rxPointer, ReadOnlySpan<byte> code)
+        {
+            if (DebuggerJitPublisher.Required)
+            {
+                DebuggerJitPublisher.Publish(rxPointer, code);
+            }
+            else
+            {
+                code.CopyTo(new Span<byte>((void*)rwPointer, code.Length));
+            }
+        }
+
         private unsafe IntPtr AddThreadLocalFunction(ReadOnlySpan<byte> code, ulong guestAddress)
         {
             int alignedSize = BitUtils.AlignUp(code.Length, (int)MemoryBlock.GetPageSize());
@@ -479,9 +500,8 @@ namespace Ryujinx.Cpu.LightningJit.Cache
 
             Debug.Assert((funcOffset & (int)(MemoryBlock.GetPageSize() - 1)) == 0);
 
-            IntPtr funcPtr = _localCache.Pointer + funcOffset;
-            code.CopyTo(new Span<byte>((void*)funcPtr, code.Length));
-            funcPtr = _localCache.RxPointer + funcOffset;
+            IntPtr funcPtr = _localCache.RxPointer + funcOffset;
+            WriteCode(_localCache.Pointer + funcOffset, funcPtr, code);
 
             (_threadLocalCache ??= new()).Add(guestAddress, new(funcOffset, code.Length, funcPtr));
 
