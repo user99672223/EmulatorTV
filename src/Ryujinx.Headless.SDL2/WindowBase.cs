@@ -335,6 +335,8 @@ namespace Ryujinx.Headless.SDL2
 
                     if (Device.WaitFifo())
                     {
+                        Ryujinx.Common.Diagnostics.RunCounters.FifoWork();
+
                         Device.Statistics.RecordFifoStart();
                         Device.ProcessFrame();
                         Device.Statistics.RecordFifoEnd();
@@ -344,9 +346,19 @@ namespace Ryujinx.Headless.SDL2
                     {
                         Device.PresentFrame(SwapBuffers);
 
+                        Ryujinx.Common.Diagnostics.RunCounters.FramePresented();
+
                         if (firstFrame)
                         {
                             firstFrame = false;
+
+                            // The iOS app consumes this callback to drop its loading
+                            // overlay; nothing on tvOS listens, and "did a frame ever
+                            // reach the screen" is exactly the question a black screen
+                            // raises, so say it in the log too.
+                            Logger.Notice.Print(LogClass.Application,
+                                "First frame presented to the swapchain.");
+
                             Program.TriggerCallback("ran-first-frame");
                         }
                     }

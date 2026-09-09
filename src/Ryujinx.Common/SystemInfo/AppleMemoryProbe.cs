@@ -225,6 +225,11 @@ namespace Ryujinx.Common.SystemInfo
                 try
                 {
                     Log($"{label} t+{seconds}s");
+
+                    // Deltas, so a static line means genuinely nothing happened in
+                    // the interval rather than nothing having happened since boot.
+                    Logger.Notice.Print(LogClass.Application,
+                        $"[RUN] t+{seconds}s  {Diagnostics.RunCounters.SampleDelta()}");
                 }
                 catch
                 {

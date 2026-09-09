@@ -184,6 +184,8 @@ namespace Ryujinx.Cpu.LightningJit
                 Logger.Notice.Print(LogClass.Cpu, $"Entering translated guest code for the first time at 0x{address:X}.");
             }
 
+            Ryujinx.Common.Diagnostics.RunCounters.GuestDispatch();
+
             Stubs.DispatchLoop(context.NativeContextPtr, address);
 
             if (Interlocked.Exchange(ref _loggedFirstReturn, 1) == 0)
@@ -332,6 +334,12 @@ namespace Ryujinx.Cpu.LightningJit
 
         private TranslatedFunction Translate(ulong address, ExecutionMode mode)
         {
+            // New code being compiled means the guest is reaching instructions it has
+            // not run before, i.e. it is making progress. A guest spinning inside code
+            // it already translated shows zero here, which is the difference between
+            // "stuck in a retry loop" and "advancing slowly".
+            Ryujinx.Common.Diagnostics.RunCounters.Translation();
+
             CompiledFunction func = Compile(address, mode);
             IntPtr funcPointer = JitCache.Map(func.Code);
 

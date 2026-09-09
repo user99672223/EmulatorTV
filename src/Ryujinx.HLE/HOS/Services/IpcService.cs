@@ -140,6 +140,8 @@ namespace Ryujinx.HLE.HOS.Services
 
             context.ResponseData.BaseStream.Seek(_isDomain ? 0x20 : 0x10, SeekOrigin.Begin);
 
+            Ryujinx.Common.Diagnostics.RunCounters.IpcCall(service.GetType().Name);
+
             ResultCode result = service.InvokeCmifMethod(commandId, context);
 
             if (_isDomain)
@@ -165,6 +167,8 @@ namespace Ryujinx.HLE.HOS.Services
             int commandId = (int)context.Request.Type - 0x10;
 
             context.ResponseData.BaseStream.Seek(0x4, SeekOrigin.Begin);
+
+            Ryujinx.Common.Diagnostics.RunCounters.IpcCall(GetType().Name);
 
             ResultCode result = InvokeTipcMethod(commandId, context);
 
