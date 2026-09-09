@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
@@ -161,12 +162,34 @@ namespace Ryujinx.Memory
             }
         }
 
+        private static int _sharedMemoryCount;
+        private static long _sharedMemoryBytes;
+
         public static IntPtr AllocateSharedMemory(ulong size, bool reserve)
         {
             IntPtr address = IntPtr.Zero;
-            HandleMachError(
-                vm_allocate(_selfTask, &address, (IntPtr)size, Flags.VM_FLAGS_ANYWHERE),
-                "vm_allocate");
+            int result = vm_allocate(_selfTask, &address, (IntPtr)size, Flags.VM_FLAGS_ANYWHERE);
+
+            if (result != 0)
+            {
+                // Say how many of these succeeded before this one did not.
+                //
+                // vm_allocate reporting KERN_NO_SPACE (3) while the process still
+                // has most of its memory free is a statement about the address map,
+                // not about bytes -- so the count of live mappings and their sizes
+                // is the number that explains it, and it is the one number the
+                // exception did not carry.
+                throw new InvalidOperationException(
+                    $"Mach operation 'vm_allocate' failed with error: {result} "
+                    + $"(requested {size / 1024} KiB, after "
+                    + $"{Volatile.Read(ref _sharedMemoryCount)} successful "
+                    + $"allocations totalling "
+                    + $"{Interlocked.Read(ref _sharedMemoryBytes) / (1024 * 1024)} MiB)");
+            }
+
+            Interlocked.Increment(ref _sharedMemoryCount);
+            Interlocked.Add(ref _sharedMemoryBytes, (long)size);
+
             return address;
         }
 

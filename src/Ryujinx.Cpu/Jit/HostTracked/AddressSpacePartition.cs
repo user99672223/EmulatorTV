@@ -27,7 +27,29 @@ namespace Ryujinx.Cpu.Jit.HostTracked
     {
         public const ulong GuestPageSize = 0x1000;
 
-        private const int DefaultBlockAlignment = 1 << 20;
+        // Guest memory is carved out of blocks this big, and each block is a
+        // separate vm_allocate plus a mach memory entry because it is Mirrorable.
+        // At 1 MiB a game that touches a few hundred MiB of guest memory needs
+        // hundreds of them, and on tvOS that ran the address map out of entries:
+        // vm_allocate returned KERN_NO_SPACE with 1.7 GiB still free, so it was
+        // never about bytes. Bigger blocks mean proportionally fewer entries, and
+        // cost only address space -- pages are committed when touched, not when
+        // reserved.
+        private static readonly ulong DefaultBlockAlignment = PrivateBlockAlignmentFromEnv();
+
+        private static ulong PrivateBlockAlignmentFromEnv()
+        {
+            string value = Environment.GetEnvironmentVariable("AS_PRIVATE_BLOCK_MIB");
+
+            if (ulong.TryParse(value, out ulong mib) && mib > 0)
+            {
+                return mib * 1024 * 1024;
+            }
+
+            return (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+                ? 64UL * 1024 * 1024
+                : 1UL << 20;
+        }
 
         private enum MappingType : byte
         {
