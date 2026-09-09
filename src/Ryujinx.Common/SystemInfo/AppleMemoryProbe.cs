@@ -203,7 +203,7 @@ namespace Ryujinx.Common.SystemInfo
             }
 
             Logger.Notice.Print(LogClass.Application,
-                $"[MEM] {stage,-32} available {availableText}   resident {usedText}   managed {managed / Mib,7:F1} MiB{deltaText}");
+                $"[MEM] {stage,-32} available {availableText}   resident {usedText}   managed {managed / Mib,7:F1} MiB{deltaText}   [{DescribeAddressSpace()}]");
         }
 
         /// <summary>
