@@ -30,6 +30,35 @@
   <StripSymbols>false</StripSymbols>
   <!-- <IlcGenerateDebugInfo>true</IlcGenerateDebugInfo> -->
 </PropertyGroup>
+  <!-- Stop the runtime reserving the address space the guest needs.
+       Measured on device at the instant the guest was refused a mapping: two
+       PROT_NONE reservations of 384.0 GiB and 52.9 GiB, present from launch and
+       before the guest process exists, against 8.3 GiB actually mapped. They
+       leave one usable hole, 0x7000000000 to the 0x7180000000 ceiling, which is
+       6 GiB; the guest fills it and vm_allocate returns KERN_NO_SPACE with the
+       device still holding 1.7 GB free. No Ryujinx allocation accounts for
+       either reservation. Every MemoryBlock of a GiB or more was logged, and
+       they are the guest DRAM, the page table and the JIT cache.
+
+       DOTNET_GCRegionRange is already set from Swift and the reservation is
+       still there. Setting it here as well covers the case where that is a
+       timing problem: the NativeAOT runtime initialises when its dylib loads,
+       which is before any app code runs, so a setenv in MeloTVApp.init can
+       arrive after the reservation has been made.
+
+       Measured on the desktop CoreCLR build, the embedded form does nothing and
+       only the environment variable moves the number. NativeAOT reads its
+       configuration through a different path, so this is worth one build to
+       find out; if the reservation does not move, the remaining option is to
+       dlopen the core after the environment is set rather than link it. -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.RegionRange" Value="0x100000000" Trim="false" />
+    <RuntimeHostConfigurationOption Include="GCRegionRange" Value="0x100000000" Trim="false" />
+    <RuntimeHostConfigurationOption Include="System.GC.Server" Value="false" Trim="false" />
+    <RuntimeHostConfigurationOption Include="System.GC.Concurrent" Value="false" Trim="false" />
+    <RuntimeHostConfigurationOption Include="System.GC.RetainVM" Value="false" Trim="false" />
+  </ItemGroup>
+
   <!-- iOS linking stuff from godot -->
 
   <PropertyGroup>
