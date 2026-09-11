@@ -1,4 +1,4 @@
-﻿namespace Ryujinx.HLE
+namespace Ryujinx.HLE
 {
     /// <summary>
     /// Host-side overrides for the guest memory layout.
@@ -20,6 +20,18 @@
         /// kernel initialisation.
         /// </summary>
         public static ulong? ApplicationPoolSizeBytes { get; set; }
+
+        /// <summary>
+        /// Overrides the applet memory pool size, in bytes. When null the size comes
+        /// from the selected <see cref="MemoryConfiguration"/> as usual.
+        ///
+        /// The stock arrangement reserves 507 MiB for system applets layered over a
+        /// running game -- the home menu overlay, the software keyboard. A single
+        /// game running offline never uses any of it, and on a constrained host that
+        /// is 507 MiB the application cannot have. Lowering this moves the space to
+        /// the application pool without enlarging DRAM, so it costs no address space.
+        /// </summary>
+        public static ulong? AppletPoolSizeBytes { get; set; }
 
         /// <summary>
         /// Overrides the emulated DRAM size, in bytes. When null the size comes from

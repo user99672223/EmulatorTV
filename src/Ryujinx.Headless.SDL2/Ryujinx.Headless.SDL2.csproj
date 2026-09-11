@@ -1,8 +1,13 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <RuntimeIdentifiers>ios-arm64;tvos-arm64</RuntimeIdentifiers>
+    <!-- Opt-in desktop build. Set -p:HeadlessWindowsExe=true to get a runnable
+         Windows exe for reproducing emulation bugs off-device; never set by the
+         tvOS build, which keeps building this project as a library. -->
+    <OutputType Condition=" '$(HeadlessWindowsExe)' == 'true' ">Exe</OutputType>
+    <RuntimeIdentifiers Condition=" '$(HeadlessWindowsExe)' == 'true' ">win-x64</RuntimeIdentifiers>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Version>1.0.0-dirty</Version>
     <DefineConstants Condition=" '$(ExtraDefineConstants)' != '' ">$(DefineConstants);$(ExtraDefineConstants)</DefineConstants>
@@ -73,14 +78,16 @@
   </Target>
 
   <Target Name="FixDylib"
-          AfterTargets="Publish">
+          AfterTargets="Publish"
+          Condition=" '$(HeadlessWindowsExe)' != 'true' ">
     <!-- The dylib id needs to be changed to have @rpath -->
 
     <Exec Command="install_name_tool -id @rpath/$(TargetName).dylib $(NativeBinary)" ConsoleToMSBuild="true" />
   </Target>
 
   <Target Name="FixSymbols"
-          AfterTargets="Publish">
+          AfterTargets="Publish"
+          Condition=" '$(HeadlessWindowsExe)' != 'true' ">
 
     <RemoveDir Directories="$(PublishDir)$(TargetName).framework.dSYM"/>
 

@@ -1,4 +1,4 @@
-﻿using Ryujinx.HLE.HOS.Kernel.Memory;
+using Ryujinx.HLE.HOS.Kernel.Memory;
 using System;
 
 namespace Ryujinx.HLE.HOS.Kernel.Common
@@ -42,6 +42,12 @@ namespace Ryujinx.HLE.HOS.Kernel.Common
 
         public static ulong GetAppletPoolSize(MemoryArrange arrange)
         {
+            // A host-side override wins over the arrangement. See MemoryTuning.
+            if (MemoryTuning.AppletPoolSizeBytes is ulong overridden)
+            {
+                return overridden;
+            }
+
             return arrange switch
             {
                 MemoryArrange.MemoryArrange4GiB => 507 * MiB,

@@ -1,4 +1,4 @@
-﻿using CommandLine;
+using CommandLine;
 using Ryujinx.Common.Configuration;
 using Ryujinx.HLE.HOS.SystemState;
 
@@ -296,6 +296,9 @@ namespace Ryujinx.Headless.SDL2
 
         [Option("application-pool-mib", Required = false, Default = 0, HelpText = "Size of the guest application memory pool in MiB. 0 uses the value implied by the memory configuration (3285 MiB on a stock 4GiB system). Lower this on memory constrained hosts so the guest sizes its heaps to fit.")]
         public int ApplicationPoolMiB { get; set; }
+
+        [Option("applet-pool-mib", Required = false, Default = 0, HelpText = "Size of the guest applet memory pool in MiB. 0 uses the value implied by the memory configuration (507 MiB on a stock 4GiB system). A single game running offline uses none of it, so lowering this frees space for the application pool without enlarging DRAM.")]
+        public int AppletPoolMiB { get; set; }
 
         [Option("dram-mib", Required = false, Default = 0, HelpText = "Size of the emulated DRAM in MiB. 0 uses the memory configuration's value (4096). This is reserved as one contiguous block of address space, so lowering it is how to fit on a host that lacks extended virtual addressing.")]
         public int DramMiB { get; set; }

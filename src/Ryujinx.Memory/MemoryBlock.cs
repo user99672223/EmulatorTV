@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
@@ -26,7 +26,10 @@ namespace Ryujinx.Memory
         /// <summary>
         /// Pointer to the RX mapping (for execution), or IntPtr.Zero if not dual-mapped.
         /// </summary>
-        public IntPtr RxPointer => _rxPointer;
+        // Only a dual-mapped block has a separate executable view. Without one the
+        // single mapping is the executable view once it has been reprotected, so fall
+        // back to it rather than handing out a null pointer.
+        public IntPtr RxPointer => _rxPointer != IntPtr.Zero ? _rxPointer : _pointer;
 
         /// <summary>
         /// Size of the memory block.
@@ -43,7 +46,11 @@ namespace Ryujinx.Memory
         public MemoryBlock(ulong size, MemoryAllocationFlags flags = MemoryAllocationFlags.None)
         {
             Size = size;
-            if (flags.HasFlag(MemoryAllocationFlags.DualMapping))
+            // DualMappedJitAllocator is an Apple-only path: it mmaps through libc and
+            // talks to the BreakpointJIT framework. Elsewhere, allocate normally and
+            // let the caller reprotect -- which is what a W^X-free host allows anyway.
+            if (flags.HasFlag(MemoryAllocationFlags.DualMapping)
+                && (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacOS()))
             {
                 _dualMappedAllocator = new DualMappedJitAllocator(size);
                 _pointer = _dualMappedAllocator.RwPtr;

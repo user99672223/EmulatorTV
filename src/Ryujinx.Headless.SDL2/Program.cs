@@ -36,6 +36,7 @@ using Silk.NET.Vulkan;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
@@ -89,11 +90,35 @@ namespace Ryujinx.Headless.SDL2
         private static readonly TitleUpdateMetadataJsonSerializerContext _titleSerializerContext = new(JsonHelper.GetDefaultSerializerOptions());
 
                 
-        [DllImport("RyujinxHelper.framework/RyujinxHelper", CallingConvention = CallingConvention.Cdecl)]
-        public static extern void TriggerCallbackWithData(string cIdentifier, IntPtr data,  UIntPtr dataLength);
+        [DllImport("RyujinxHelper.framework/RyujinxHelper", EntryPoint = "TriggerCallbackWithData", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void TriggerCallbackWithDataNative(string cIdentifier, IntPtr data,  UIntPtr dataLength);
 
-        [DllImport("RyujinxHelper.framework/RyujinxHelper", CallingConvention = CallingConvention.Cdecl)]
-        public static extern void TriggerCallback(string cIdentifier);
+        [DllImport("RyujinxHelper.framework/RyujinxHelper", EntryPoint = "TriggerCallback", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void TriggerCallbackNative(string cIdentifier);
+
+        /// <summary>
+        /// These call back into the Swift host, which only exists inside the app
+        /// bundle. Off Apple there is nobody listening, so they do nothing rather than
+        /// throwing DllNotFoundException from whichever thread happened to report
+        /// progress.
+        /// </summary>
+        private static bool HasNativeHost => OperatingSystem.IsIOS() || OperatingSystem.IsTvOS();
+
+        public static void TriggerCallbackWithData(string cIdentifier, IntPtr data, UIntPtr dataLength)
+        {
+            if (HasNativeHost)
+            {
+                TriggerCallbackWithDataNative(cIdentifier, data, dataLength);
+            }
+        }
+
+        public static void TriggerCallback(string cIdentifier)
+        {
+            if (HasNativeHost)
+            {
+                TriggerCallbackNative(cIdentifier);
+            }
+        }
 
         [UnmanagedCallersOnly(EntryPoint = "main_ryujinx_sdl")]
         public static unsafe int MainExternal(int argCount, IntPtr* pArgs)
@@ -574,14 +599,41 @@ namespace Ryujinx.Headless.SDL2
         [UnmanagedCallersOnly(EntryPoint = "initialize-dualmapped")]
         public static unsafe bool InitializeDM() => Cpu.LightningJit.DualMappedTranslator.InitializeDualMapped();
 
+        /// <summary>
+        /// Some SDL2 entry points are imported by their Apple framework path rather
+        /// than by bare name. That path is correct inside an app bundle and meaningless
+        /// anywhere else, so off Apple it is mapped back to the plain library name.
+        /// </summary>
+        private static void RegisterDesktopNativeLibraries()
+        {
+            if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacOS())
+            {
+                return;
+            }
+
+            static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? path)
+                => name == "SDL2.framework/SDL2" && NativeLibrary.TryLoad("SDL2", assembly, path, out IntPtr handle)
+                    ? handle
+                    : IntPtr.Zero;
+
+            // Both the headless assembly (window/icon calls) and the audio backend
+            // import through that path, and a resolver is per-assembly.
+            NativeLibrary.SetDllImportResolver(typeof(Program).Assembly, Resolve);
+            NativeLibrary.SetDllImportResolver(typeof(SDL2HardwareDeviceDriver).Assembly, Resolve);
+        }
+
         static void Main(string[] args)
         {
             AppleNativeLibraries.Register();
+            RegisterDesktopNativeLibraries();
 
             // Make process DPI aware for proper window sizing on high-res screens.
             ForceDpiAware.Windows();
 
-            Silk.NET.Core.Loader.SearchPathContainer.Platform = Silk.NET.Core.Loader.UnderlyingPlatform.MacOS;
+            if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+            {
+                Silk.NET.Core.Loader.SearchPathContainer.Platform = Silk.NET.Core.Loader.UnderlyingPlatform.MacOS;
+            }
 
             if (!(OperatingSystem.IsIOS() || OperatingSystem.IsTvOS()))
             {
@@ -1489,6 +1541,14 @@ namespace Ryujinx.Headless.SDL2
                     $"Application memory pool overridden to {option.ApplicationPoolMiB} MiB.");
             }
 
+            if (option.AppletPoolMiB > 0)
+            {
+                MemoryTuning.AppletPoolSizeBytes = (ulong)option.AppletPoolMiB * 1024 * 1024;
+
+                Logger.Notice.Print(LogClass.Application,
+                    $"Applet memory pool overridden to {option.AppletPoolMiB} MiB.");
+            }
+
             if (option.DramMiB > 0)
             {
                 MemoryTuning.DramSizeBytes = (ulong)option.DramMiB * 1024 * 1024;
@@ -1497,13 +1557,25 @@ namespace Ryujinx.Headless.SDL2
                     $"Emulated DRAM overridden to {option.DramMiB} MiB.");
             }
 
+            // The Apple entry points create this before calling Load; a plain Main
+            // (the desktop repro build) has no such caller, so make it here when it
+            // is missing. Same lazy pattern as the other entry points use.
+            if (_virtualFileSystem == null)
+            {
+                AppDataManager.Initialize(option.BaseDataDir);
+
+                _virtualFileSystem = VirtualFileSystem.CreateInstance();
+            }
+
             _libHacHorizonManager = new LibHacHorizonManager();
             _libHacHorizonManager.InitializeFsServer(_virtualFileSystem);
             _libHacHorizonManager.InitializeArpServer();
             _libHacHorizonManager.InitializeBcatServer();
             _libHacHorizonManager.InitializeSystemClients();
 
-            // _contentManager = new ContentManager(_virtualFileSystem);
+            // InitializeCore makes this for the Apple entry points; LoadApplication
+            // dereferences it for the firmware version, so a plain Main needs it too.
+            _contentManager ??= new ContentManager(_virtualFileSystem);
 
             _accountManager = new AccountManager(_libHacHorizonManager.RyujinxClient, option.UserProfile);
 
@@ -1568,6 +1640,11 @@ namespace Ryujinx.Headless.SDL2
 
                 option.InputPath = contentPath;
             }
+
+            // InitializeCore builds the input manager for the Apple entry points and
+            // pairs the keyboard with NativeGamepadDriver (GameController.framework).
+            // A plain Main has neither, so build the SDL2 pair here instead.
+            _inputManager ??= new InputManager(new SDL2KeyboardDriver(), new SDL2GamepadDriver());
 
             _inputConfiguration = new List<InputConfig>();
             _enableKeyboard = option.EnableKeyboard;

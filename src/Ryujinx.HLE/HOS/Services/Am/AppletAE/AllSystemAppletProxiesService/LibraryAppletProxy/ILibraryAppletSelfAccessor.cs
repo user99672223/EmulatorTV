@@ -60,7 +60,12 @@ namespace Ryujinx.HLE.HOS.Services.Am.AppletAE.AllSystemAppletProxiesService.Lib
         // ExitProcessAndReturn() -> nn::am::service::ExitProcessAndReturn
         public ResultCode ExitProcessAndReturn(ServiceCtx context)
         {
-            TriggerCallback("exit-emulation");
+            if (OperatingSystem.IsIOS() || OperatingSystem.IsTvOS())
+            {
+                // Only the Swift host implements this; elsewhere there is no helper
+                // library to call into.
+                TriggerCallback("exit-emulation");
+            }
             return ResultCode.Success;
         }
 

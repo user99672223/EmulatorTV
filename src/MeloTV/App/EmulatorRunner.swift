@@ -21,7 +21,7 @@ final class EmulatorRunner: ObservableObject {
     /// Boots a title. The core's main loop blocks for the lifetime of the game,
     /// so it gets its own thread with a large stack; the UI thread stays free to
     /// service the SDL main-thread dispatcher the core installs on Apple targets.
-    func start(game: URL, applicationPoolMiB: Int, dramMiB: Int = 2048) {
+    func start(game: URL, applicationPoolMiB: Int, appletPoolMiB: Int = 16, dramMiB: Int = 2048) {
         guard !isRunning, !isPreparing else { return }
         lastMessage = nil
 
@@ -62,6 +62,25 @@ final class EmulatorRunner: ObservableObject {
 
         if applicationPoolMiB > 0 {
             args += ["--application-pool-mib", String(applicationPoolMiB)]
+        }
+
+        // The stock arrangement parks 507 MiB in the applet pool for system applets
+        // layered over a running game -- the home menu overlay, the software
+        // keyboard. None of that happens here, and inside a 2048 MiB DRAM it was
+        // 507 MiB the game could not have.
+        //
+        // Measured: at an application pool of 1280 MiB the guest is told it has
+        // 1196 MiB, reserves 1048 MiB of fixed GPU blocks (targets, textures,
+        // buffers, shaders, command buffers, queries), and dies initialising the
+        // texture sampler pools with "Pure virtual function called!" -- an
+        // allocation returned null and the object was used anyway.
+        //
+        // Handing the applet pool's space to the application pool reaches the main
+        // menu on the same 2048 MiB of DRAM. Note the service pool cannot absorb
+        // this instead: squeezed to its 64 MiB floor the loader dies before the
+        // game starts.
+        if appletPoolMiB > 0 {
+            args += ["--applet-pool-mib", String(appletPoolMiB)]
         }
 
         // The emulated DRAM is reserved as one contiguous block of address space,

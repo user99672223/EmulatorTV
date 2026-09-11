@@ -9,11 +9,21 @@ struct ContentView: View {
     @State private var selected: StoredFile?
     // 1536 by default rather than the stock 3285: the pools have to fit inside the
     // reduced DRAM, and the measured desktop peak for this title was about 1200 MiB.
-    @State private var poolMiB: Int = 1536
+    @State private var poolMiB: Int = 1750
     @State private var note: String?
 
+    // 1750 is the default: it is the value verified all the way to Rocket League's
+    // main menu. 1850 also boots and leaves the game more room, but trims the
+    // service pool to 129 MiB.
+    //
+    // Do not raise this past 1850 on a 2048 MiB DRAM. The pools are carved from the
+    // top down and the service pool takes what is left, so a larger application pool
+    // pushes it to its 64 MiB floor -- at which point the process dies loading the
+    // main module, before the game runs and without printing anything. 1915 does
+    // exactly that.
     private let poolChoices: [(String, Int)] = [
-        ("1536 MiB", 1536), ("1280 MiB", 1280), ("1024 MiB", 1024), ("Stock (3285 MiB)", 0),
+        ("1750 MiB", 1750), ("1850 MiB", 1850), ("1536 MiB", 1536),
+        ("1280 MiB", 1280), ("Stock (3285 MiB)", 0),
     ]
 
     var body: some View {
