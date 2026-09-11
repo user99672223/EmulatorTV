@@ -1,4 +1,4 @@
-﻿using Ryujinx.Common.Configuration;
+using Ryujinx.Common.Configuration;
 using Ryujinx.Common.Logging;
 using Ryujinx.Cpu;
 using Ryujinx.Cpu.AppleHv;
@@ -74,7 +74,16 @@ namespace Ryujinx.HLE.HOS
                 AddressSpace addressSpace = null;
 
                 // We want to use host tracked mode if the host page size is > 4KB.
-                if ((mode == MemoryManagerMode.HostMapped || mode == MemoryManagerMode.HostMappedUnsafe) && MemoryBlock.GetPageSize() <= 0x1000)
+                //
+                // That makes the choice a property of the host: tvOS has 16KB pages and
+                // takes host tracked, while a 4KB desktop takes host mapped. The two are
+                // different memory managers with different mapping paths, so a desktop
+                // run does not exercise what the device runs. FORCE_HOST_TRACKED lets the
+                // desktop repro harness take the device's path deliberately; without it
+                // the behaviour is exactly as before.
+                bool forceHostTracked = Environment.GetEnvironmentVariable("FORCE_HOST_TRACKED") == "1";
+
+                if ((mode == MemoryManagerMode.HostMapped || mode == MemoryManagerMode.HostMappedUnsafe) && MemoryBlock.GetPageSize() <= 0x1000 && !forceHostTracked)
                 {
                     if (!AddressSpace.TryCreate(context.Memory, addressSpaceSize, out addressSpace))
                     {

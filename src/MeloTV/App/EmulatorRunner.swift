@@ -21,7 +21,7 @@ final class EmulatorRunner: ObservableObject {
     /// Boots a title. The core's main loop blocks for the lifetime of the game,
     /// so it gets its own thread with a large stack; the UI thread stays free to
     /// service the SDL main-thread dispatcher the core installs on Apple targets.
-    func start(game: URL, applicationPoolMiB: Int, appletPoolMiB: Int = 16, dramMiB: Int = 2048) {
+    func start(game: URL, applicationPoolMiB: Int, appletPoolMiB: Int = 16, asBlockAlignMiB: Int = 64, dramMiB: Int = 2048) {
         guard !isRunning, !isPreparing else { return }
         lastMessage = nil
 
@@ -104,6 +104,23 @@ final class EmulatorRunner: ObservableObject {
         // boots and main_ryujinx_sdl just returns 0. The id must match the pointer
         // ControllerManager hands to attach_gamepad.
         args += ["--input-id-1", ControllerManager.gamepadIdString]
+
+        // Host address space is the scarcest thing on this device, and a third of what
+        // the guest gets is lost to allocation granularity.
+        //
+        // Measured at the refusal: of the ~6 GiB hole the guest has to work in, 4000 MiB
+        // was mapped and 2078 MiB was reserved and never mapped, mostly in 128 MiB
+        // pieces. That waste is the partition allocator's block size, which defaults to
+        // 256 MiB here.
+        //
+        // This is an environment variable rather than an argument because the core reads
+        // it directly, and it is read lazily when the first partition is created -- well
+        // after this point -- so setting it here takes effect.
+        if asBlockAlignMiB > 0 {
+            setenv("AS_BLOCK_ALIGN_MIB", String(asBlockAlignMiB), 1)
+            EmulatorRunner.log("AS_BLOCK_ALIGN_MIB=\(asBlockAlignMiB)")
+        }
+
         args += ["--controller-type-1", "ProController"]
 
         EmulatorRunner.log("starting: " + args.joined(separator: " "))

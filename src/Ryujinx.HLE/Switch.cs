@@ -43,22 +43,18 @@ namespace Ryujinx.HLE
             FileSystem = Configuration.VirtualFileSystem;
             UIHandler = Configuration.HostUIHandler;
 
-            // Host-tracked mode maps guest ranges as views of this block, but only if
-            // it is mirrorable. Without the flag AddressSpacePartition falls back to
-            // MapPrivate, which allocates fresh backing memory for every range, so the
-            // same guest memory is paid for twice: once here and once per partition.
+            // Mirrorable was tried here and reverted.
             //
-            // On the device that is what exhausts the address space. The guest gets a
-            // single usable hole of about 6 GiB, and roughly 1.5 GiB of guest memory
-            // consumed all of it before vm_allocate returned KERN_NO_SPACE with 1.7 GB
-            // of the device still free.
+            // The idea was that host-tracked mode would map guest ranges as views of
+            // this block rather than allocating fresh memory per range. It does not:
+            // AddressSpacePartition.Map always takes MappingType.Private, so there is
+            // no view path for the flag to enable. All it did was route the 2 GiB DRAM
+            // block through AllocateSharedMemory, moving it into the same constrained
+            // hole the guest allocates from.
             //
-            // The flag was commented out by the original iOS port, before this fork had
-            // a working shared-memory path. It has one now: MachJitWorkaround allocates
-            // through vm_allocate and MapPrivate already depends on it.
-            MemoryAllocationFlags memoryAllocationFlags = configuration.MemoryManagerMode == MemoryManagerMode.SoftwarePageTable
-                ? MemoryAllocationFlags.Reserve
-                : MemoryAllocationFlags.Reserve | MemoryAllocationFlags.Mirrorable;
+            // Measured on device: the running total at refusal went from 1179 MiB to
+            // 3163 MiB, and the game got no further either way.
+            MemoryAllocationFlags memoryAllocationFlags = MemoryAllocationFlags.Reserve;
 
 #pragma warning disable IDE0055 // Disable formatting
             AudioDeviceDriver = AddAudioCompatLayers(Configuration.AudioDeviceDriver);

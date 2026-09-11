@@ -10,6 +10,7 @@ struct ContentView: View {
     // 1536 by default rather than the stock 3285: the pools have to fit inside the
     // reduced DRAM, and the measured desktop peak for this title was about 1200 MiB.
     @State private var poolMiB: Int = 1750
+    @State private var asBlockMiB: Int = 64
     @State private var note: String?
 
     // 1750 is the default: it is the value verified all the way to Rocket League's
@@ -21,6 +22,14 @@ struct ContentView: View {
     // pushes it to its 64 MiB floor -- at which point the process dies loading the
     // main module, before the game runs and without printing anything. 1915 does
     // exactly that.
+    // Partition allocator block size. 256 is the old default and the one that left
+    // 2078 MiB of the guest's ~6 GiB hole reserved and unmapped. Selectable so the
+    // useful value can be found on the device in minutes rather than one build each.
+    private let asBlockChoices: [(String, Int)] = [
+        ("AS block 64 MiB", 64), ("AS block 32 MiB", 32),
+        ("AS block 16 MiB", 16), ("AS block 256 MiB (old)", 256),
+    ]
+
     private let poolChoices: [(String, Int)] = [
         ("1750 MiB", 1750), ("1850 MiB", 1850), ("1536 MiB", 1536),
         ("1280 MiB", 1280), ("Stock (3285 MiB)", 0),
@@ -76,6 +85,11 @@ struct ContentView: View {
                 }
                 .frame(maxWidth: 480)
 
+                Picker("Address space block", selection: $asBlockMiB) {
+                    ForEach(asBlockChoices, id: \.1) { Text($0.0).tag($0.1) }
+                }
+                .frame(maxWidth: 480)
+
                 // Deliberately never disabled: a disabled button cannot take focus on
                 // tvOS, so gating it would strand the remote with nothing to select.
                 // It reports what is missing instead.
@@ -85,7 +99,7 @@ struct ContentView: View {
                         return
                     }
                     if let game = selected ?? library.games.first {
-                        runner.start(game: game.url, applicationPoolMiB: poolMiB)
+                        runner.start(game: game.url, applicationPoolMiB: poolMiB, asBlockAlignMiB: asBlockMiB)
                     }
                 } label: {
                     Label(startTitle, systemImage: "play.fill")
