@@ -1,4 +1,4 @@
-﻿using Ryujinx.Audio.Backends.CompatLayer;
+using Ryujinx.Audio.Backends.CompatLayer;
 using Ryujinx.Audio.Backends.DelayLayer;
 using Ryujinx.Audio.Integration;
 using Ryujinx.Common.Configuration;
@@ -43,9 +43,22 @@ namespace Ryujinx.HLE
             FileSystem = Configuration.VirtualFileSystem;
             UIHandler = Configuration.HostUIHandler;
 
+            // Host-tracked mode maps guest ranges as views of this block, but only if
+            // it is mirrorable. Without the flag AddressSpacePartition falls back to
+            // MapPrivate, which allocates fresh backing memory for every range, so the
+            // same guest memory is paid for twice: once here and once per partition.
+            //
+            // On the device that is what exhausts the address space. The guest gets a
+            // single usable hole of about 6 GiB, and roughly 1.5 GiB of guest memory
+            // consumed all of it before vm_allocate returned KERN_NO_SPACE with 1.7 GB
+            // of the device still free.
+            //
+            // The flag was commented out by the original iOS port, before this fork had
+            // a working shared-memory path. It has one now: MachJitWorkaround allocates
+            // through vm_allocate and MapPrivate already depends on it.
             MemoryAllocationFlags memoryAllocationFlags = configuration.MemoryManagerMode == MemoryManagerMode.SoftwarePageTable
                 ? MemoryAllocationFlags.Reserve
-                : MemoryAllocationFlags.Reserve; //  | MemoryAllocationFlags.Mirrorable;
+                : MemoryAllocationFlags.Reserve | MemoryAllocationFlags.Mirrorable;
 
 #pragma warning disable IDE0055 // Disable formatting
             AudioDeviceDriver = AddAudioCompatLayers(Configuration.AudioDeviceDriver);
