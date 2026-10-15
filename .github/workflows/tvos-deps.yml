@@ -52,7 +52,7 @@ jobs:
           echo "$LC" | grep -qiE "LC_VERSION_MIN_TVOS|platform 3|platform tvos"             || { echo "FAIL: SDL2 is not a tvOS binary"; exit 1; }
           echo "OK: SDL2 built for tvOS"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: SDL2-tvos-arm64
           path: sdl/out/Release-appletvos/SDL2.framework
@@ -98,7 +98,7 @@ jobs:
           echo "$LC" | grep -qiE "LC_VERSION_MIN_TVOS|platform 3|platform tvos"             || { echo "FAIL: MoltenVK is not a tvOS binary"; exit 1; }
           echo "OK: MoltenVK built for tvOS"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: MoltenVK-tvos
           path: out/libMoltenVK.dylib

@@ -61,7 +61,7 @@ jobs:
           [ "$fail" = "0" ] || exit 1
           echo "OK: FFmpeg built for tvOS"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: FFmpeg-tvos
           path: ff/out/lib/*.dylib
